@@ -1,0 +1,16 @@
+## BPSR：パッド勢を救いたい
+
+Blue Protocol: Star Resonanceのパッド用ボタン配置を編集するための非公式ツールです。
+ゲーム内の設定だけでは調整しにくいボタン割り当てを、`localsave.bytes` を直接編集することで変更できます。
+
+### 主な機能
+
+- パッド用ボタン配置の編集
+
+### スクリーンショット
+
+![Screenshot](assets/screenshot.png)
+
+### 対応環境
+
+- Windows
