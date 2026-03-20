@@ -7,6 +7,12 @@ Blue Protocol: Star Resonanceのパッド用ボタン配置を編集するため
 
 - パッド用ボタン配置の編集
 
+### 注意事項
+
+- ゲーム起動中にこのツールで `localsave.bytes` を編集しても、変更は反映されません。
+- ボタン配置を編集する際は、**必ずゲームを終了した状態で** 行ってください。
+- 編集前に `localsave.bytes` のバックアップを取っておくことをおすすめします。
+
 ### スクリーンショット
 
 ![Screenshot](assets/screenshot.png)
