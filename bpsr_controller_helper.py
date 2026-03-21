@@ -29,6 +29,63 @@ VALUE_TO_LABEL = {value: label for value, label in KEY_OPTIONS}
 LABEL_TO_VALUE = {label: value for value, label in KEY_OPTIONS}
 BASE_ACTION_COMBO_VALUES = [label for _, label in KEY_OPTIONS]
 
+CONTROLLER_OPTIONS = ["PlayStation", "Nintendo", "Xbox"]
+DEFAULT_CONTROLLER = "PlayStation"
+
+CONTROLLER_DISPLAY_MAPS = {
+    "PlayStation": {
+        5: "L2",
+        6: "R2",
+        7: "×",
+        8: "〇",
+        10: "□",
+        11: "△",
+        15: "select",
+        17: "L1",
+        18: "R1",
+        19: "L3",
+        20: "R3",
+        23: "↑",
+        24: "↓",
+        25: "←",
+        26: "→",
+    },
+    "Nintendo": {
+        5: "ZL",
+        6: "ZR",
+        7: "B",
+        8: "A",
+        10: "Y",
+        11: "X",
+        15: "select",
+        17: "L",
+        18: "R",
+        19: "LS",
+        20: "RS",
+        23: "↑",
+        24: "↓",
+        25: "←",
+        26: "→",
+    },
+    "Xbox": {
+        5: "LT",
+        6: "RT",
+        7: "A",
+        8: "B",
+        10: "X",
+        11: "Y",
+        15: "select",
+        17: "LB",
+        18: "RB",
+        19: "LS",
+        20: "RS",
+        23: "↑",
+        24: "↓",
+        25: "←",
+        26: "→",
+    },
+}
+
 
 # =========================
 # アンカー
@@ -40,14 +97,25 @@ PRESET_REL_OFFSET = 0x17
 
 # =========================
 # 確認 / キャンセル プリセット
+# コントローラごとに表示を切り替える
 # =========================
-PRESET_OPTIONS = [
-    (0x01, "□ / ×"),
-    (0x03, "〇 / ×"),
-    (0x02, "× / 〇"),
-]
-PRESET_VALUE_TO_LABEL = {value: label for value, label in PRESET_OPTIONS}
-PRESET_LABEL_TO_VALUE = {label: value for value, label in PRESET_OPTIONS}
+PRESET_OPTIONS = {
+    "PlayStation": [
+        (0x01, "□ / ×"),
+        (0x02, "× / 〇"),
+        (0x03, "〇 / ×"),
+    ],
+    "Nintendo": [
+        (0x01, "Y / B"),
+        (0x02, "B / A"),
+        (0x03, "A / B"),
+    ],
+    "Xbox": [
+        (0x01, "X / A"),
+        (0x02, "A / B"),
+        (0x03, "B / A"),
+    ],
+}
 
 
 # =========================
@@ -140,16 +208,19 @@ class SaveEditorApp:
         self.preset_var = tk.StringVar()
         self.helper1_var = tk.StringVar()
         self.helper2_var = tk.StringVar()
+        self.controller_var = tk.StringVar(value=DEFAULT_CONTROLLER)
 
         self.preset_combobox: Optional[ttk.Combobox] = None
         self.helper1_combobox: Optional[ttk.Combobox] = None
         self.helper2_combobox: Optional[ttk.Combobox] = None
+        self.controller_combobox: Optional[ttk.Combobox] = None
         self.path_entry: Optional[ttk.Entry] = None
 
         self.reset_button: Optional[ttk.Button] = None
         self.save_button: Optional[ttk.Button] = None
 
         self._suspend_events = False
+        self._last_controller_type = self.controller_var.get()
 
         self._build_ui()
         self._bind_traces()
@@ -195,17 +266,34 @@ class SaveEditorApp:
         file_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 2: 補助キー + 確認/キャンセル
+        # frame 2: コントローラ種別
+        controller_group = ttk.LabelFrame(self.content, text="コントローラ", padding=8)
+        controller_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        controller_group.columnconfigure(0, weight=1)
+        row += 1
+
+        # frame 3: 補助キー + 確認/キャンセル
         keybind_group = ttk.LabelFrame(self.content, text="ボタン配置", padding=8)
         keybind_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         keybind_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 3: アクション一覧
+        # frame 4: アクション一覧
         action_group = ttk.LabelFrame(self.content, text="ボタン配置", padding=8)
         action_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         action_group.columnconfigure(0, weight=1)
         row += 1
+
+        # コントローラ種別
+        self.controller_combobox = self._add_top_combo_row(
+            parent=controller_group,
+            row=0,
+            label="コントローラを選択",
+            variable=self.controller_var,
+            values=CONTROLLER_OPTIONS,
+            width=10,
+            pady=(0, 0),
+        )
 
         # ファイル選択
         file_row = ttk.Frame(file_group)
@@ -229,13 +317,18 @@ class SaveEditorApp:
 
         sub_row = 0
 
+        helper_values = [
+            self._get_helper_value_to_label()[value]
+            for value, _ in HELPER_OPTIONS
+        ]
+
         self.helper1_combobox = self._add_top_combo_row(
             parent=keybind_group,
             row=sub_row,
             label="補助キー1",
             variable=self.helper1_var,
-            values=[label for _, label in HELPER_OPTIONS],
-            width=9,
+            values=list(helper_values),
+            width=10,
         )
         sub_row += 1
 
@@ -244,8 +337,8 @@ class SaveEditorApp:
             row=sub_row,
             label="補助キー2",
             variable=self.helper2_var,
-            values=[label for _, label in HELPER_OPTIONS],
-            width=9,
+            values=list(helper_values),
+            width=10,
         )
         sub_row += 1
 
@@ -254,8 +347,8 @@ class SaveEditorApp:
             row=sub_row,
             label="確認/キャンセル",
             variable=self.preset_var,
-            values=[label for _, label in PRESET_OPTIONS],
-            width=9,
+            values=[label for _, label in self._get_current_preset_options()],
+            width=10,
             pady=(0, 0),
         )
 
@@ -320,7 +413,7 @@ class SaveEditorApp:
             textvariable=var,
             values=list(BASE_ACTION_COMBO_VALUES),
             state="readonly",
-            width=9,
+            width=10,
             justify="right",
         )
         combo.grid(row=0, column=1, sticky="e")
@@ -329,6 +422,7 @@ class SaveEditorApp:
         self.comboboxes[action["name"]] = combo
 
     def _bind_traces(self):
+        self.controller_var.trace_add("write", self._on_controller_changed)
         self.preset_var.trace_add("write", self._on_any_value_changed)
         self.helper1_var.trace_add("write", self._on_helper1_changed)
         self.helper2_var.trace_add("write", self._on_helper2_changed)
@@ -394,7 +488,6 @@ class SaveEditorApp:
         if label not in current_values:
             current_values.append(label)
             combo["values"] = current_values
-        LABEL_TO_VALUE[label] = value
 
     def _ensure_preset_has_value(self, value: int, label: str):
         if self.preset_combobox is None:
@@ -403,7 +496,6 @@ class SaveEditorApp:
         if label not in current_values:
             current_values.append(label)
             self.preset_combobox["values"] = current_values
-        PRESET_LABEL_TO_VALUE[label] = value
 
     def _ensure_helper_has_value(self, which: str, value: int, label: str):
         combo = self.helper1_combobox if which == "helper1" else self.helper2_combobox
@@ -413,21 +505,52 @@ class SaveEditorApp:
         if label not in current_values:
             current_values.append(label)
             combo["values"] = current_values
-        HELPER_LABEL_TO_VALUE[label] = value
+
+    def _get_current_action_value_to_label(self) -> dict[int, str]:
+        controller = self.controller_var.get() or DEFAULT_CONTROLLER
+        return CONTROLLER_DISPLAY_MAPS.get(controller, CONTROLLER_DISPLAY_MAPS[DEFAULT_CONTROLLER])
+
+    def _get_current_action_label_to_value(self) -> dict[str, int]:
+        value_to_label = self._get_current_action_value_to_label()
+        return {label: value for value, label in value_to_label.items()}
+
+    def _get_current_preset_options(self) -> list[tuple[int, str]]:
+        controller = self.controller_var.get() or DEFAULT_CONTROLLER
+        return PRESET_OPTIONS.get(controller, PRESET_OPTIONS[DEFAULT_CONTROLLER])
+
+    def _get_current_preset_value_to_label(self) -> dict[int, str]:
+        return {value: label for value, label in self._get_current_preset_options()}
+
+    def _get_current_preset_label_to_value(self) -> dict[str, int]:
+        return {label: value for value, label in self._get_current_preset_options()}
+
+    def _get_helper_value_to_label(self) -> dict[int, str]:
+        action_map = self._get_current_action_value_to_label()
+        return {
+            0x01: action_map[17],
+            0x02: action_map[18],
+            0x04: action_map[5],
+            0x08: action_map[6],
+        }
+
+    def _get_helper_label_to_value(self) -> dict[str, int]:
+        helper_map = self._get_helper_value_to_label()
+        return {label: value for value, label in helper_map.items()}
 
     def _get_blocked_action_values(self) -> set[int]:
         blocked = set()
+        helper_label_to_value = self._get_helper_label_to_value()
 
         helper1_label = self.helper1_var.get()
-        if helper1_label in HELPER_LABEL_TO_VALUE:
-            helper1_main_value = HELPER_LABEL_TO_VALUE[helper1_label]
+        if helper1_label in helper_label_to_value:
+            helper1_main_value = helper_label_to_value[helper1_label]
             action_value = HELPER_MAIN_TO_ACTION_VALUE.get(helper1_main_value)
             if action_value is not None:
                 blocked.add(action_value)
 
         helper2_label = self.helper2_var.get()
-        if helper2_label in HELPER_LABEL_TO_VALUE:
-            helper2_main_value = HELPER_LABEL_TO_VALUE[helper2_label]
+        if helper2_label in helper_label_to_value:
+            helper2_main_value = helper_label_to_value[helper2_label]
             action_value = HELPER_MAIN_TO_ACTION_VALUE.get(helper2_main_value)
             if action_value is not None:
                 blocked.add(action_value)
@@ -436,9 +559,11 @@ class SaveEditorApp:
 
     def _refresh_action_combobox_choices(self):
         blocked_values = self._get_blocked_action_values()
+        value_to_label = self._get_current_action_value_to_label()
 
         allowed_labels = [
-            label for value, label in KEY_OPTIONS
+            value_to_label[value]
+            for value, _ in KEY_OPTIONS
             if value not in blocked_values
         ]
 
@@ -448,6 +573,64 @@ class SaveEditorApp:
             if current and current not in values:
                 values.append(current)
             combo["values"] = values
+
+    def _refresh_controller_dependent_labels(self):
+        old_controller = self._last_controller_type
+        new_controller = self.controller_var.get() or DEFAULT_CONTROLLER
+
+        old_action_value_to_label = CONTROLLER_DISPLAY_MAPS.get(old_controller, CONTROLLER_DISPLAY_MAPS[DEFAULT_CONTROLLER])
+        old_action_label_to_value = {label: value for value, label in old_action_value_to_label.items()}
+        new_action_value_to_label = CONTROLLER_DISPLAY_MAPS.get(new_controller, CONTROLLER_DISPLAY_MAPS[DEFAULT_CONTROLLER])
+
+        old_helper_value_to_label = {
+            0x01: old_action_value_to_label[17],
+            0x02: old_action_value_to_label[18],
+            0x04: old_action_value_to_label[5],
+            0x08: old_action_value_to_label[6],
+        }
+        old_helper_label_to_value = {label: value for value, label in old_helper_value_to_label.items()}
+        new_helper_value_to_label = self._get_helper_value_to_label()
+
+        old_preset_options = PRESET_OPTIONS.get(old_controller, PRESET_OPTIONS[DEFAULT_CONTROLLER])
+        new_preset_options = PRESET_OPTIONS.get(new_controller, PRESET_OPTIONS[DEFAULT_CONTROLLER])
+        old_preset_label_to_value = {label: value for value, label in old_preset_options}
+        new_preset_value_to_label = {value: label for value, label in new_preset_options}
+
+        current_preset = self.preset_var.get()
+        if current_preset in old_preset_label_to_value:
+            preset_value = old_preset_label_to_value[current_preset]
+            self.preset_var.set(new_preset_value_to_label.get(preset_value, current_preset))
+
+        for helper_var in (self.helper1_var, self.helper2_var):
+            current = helper_var.get()
+            if current in old_helper_label_to_value:
+                helper_value = old_helper_label_to_value[current]
+                helper_var.set(new_helper_value_to_label.get(helper_value, current))
+
+        for var in self.combo_vars.values():
+            current = var.get()
+            if not current:
+                continue
+            if current in old_action_label_to_value:
+                action_value = old_action_label_to_value[current]
+                var.set(new_action_value_to_label.get(action_value, current))
+
+        helper_values = [new_helper_value_to_label[v] for v, _ in HELPER_OPTIONS]
+
+        if self.helper1_combobox is not None:
+            self.helper1_combobox["values"] = list(helper_values)
+        if self.helper2_combobox is not None:
+            self.helper2_combobox["values"] = list(helper_values)
+
+        if self.preset_combobox is not None:
+            current = self.preset_var.get()
+            values = [label for _, label in new_preset_options]
+            if current and current not in values:
+                values.append(current)
+            self.preset_combobox["values"] = values
+
+        self._refresh_action_combobox_choices()
+        self._last_controller_type = new_controller
 
     def _on_any_value_changed(self, *args):
         if self._suspend_events:
@@ -459,20 +642,35 @@ class SaveEditorApp:
         if action_value is None:
             return
 
+        action_label_to_value = self._get_current_action_label_to_value()
+        helper_label_to_value = self._get_helper_label_to_value()
+
         for var in self.combo_vars.values():
             label = var.get()
             if not label:
                 continue
-            value = LABEL_TO_VALUE.get(label)
+            value = action_label_to_value.get(label)
             if value == action_value:
                 var.set("")
 
         other_var = self.helper1_var if other_helper == "helper1" else self.helper2_var
         other_label = other_var.get()
         if other_label:
-            other_value = HELPER_LABEL_TO_VALUE.get(other_label)
+            other_value = helper_label_to_value.get(other_label)
             if other_value == helper_main_value:
                 other_var.set("")
+
+    def _on_controller_changed(self, *args):
+        if self._suspend_events:
+            return
+
+        self._suspend_events = True
+        try:
+            self._refresh_controller_dependent_labels()
+        finally:
+            self._suspend_events = False
+
+        self.update_save_button_state()
 
     def _on_helper1_changed(self, *args):
         if self._suspend_events:
@@ -482,7 +680,7 @@ class SaveEditorApp:
         try:
             label = self.helper1_var.get()
             if label:
-                value = HELPER_LABEL_TO_VALUE.get(label)
+                value = self._get_helper_label_to_value().get(label)
                 if value is not None:
                     self._clear_conflicts_for_helper_value(value, other_helper="helper2")
             self._refresh_action_combobox_choices()
@@ -499,7 +697,7 @@ class SaveEditorApp:
         try:
             label = self.helper2_var.get()
             if label:
-                value = HELPER_LABEL_TO_VALUE.get(label)
+                value = self._get_helper_label_to_value().get(label)
                 if value is not None:
                     self._clear_conflicts_for_helper_value(value, other_helper="helper1")
             self._refresh_action_combobox_choices()
@@ -612,9 +810,13 @@ class SaveEditorApp:
             )
 
     def _load_values_from_dec(self, dec: bytes):
+        action_value_to_label = self._get_current_action_value_to_label()
+        helper_value_to_label = self._get_helper_value_to_label()
+        preset_value_to_label = self._get_current_preset_value_to_label()
+
         preset_off = self.get_preset_offset()
         preset_value = dec[preset_off]
-        preset_label = PRESET_VALUE_TO_LABEL.get(preset_value)
+        preset_label = preset_value_to_label.get(preset_value)
         if preset_label is None:
             preset_label = "不明"
             self._ensure_preset_has_value(preset_value, preset_label)
@@ -622,7 +824,7 @@ class SaveEditorApp:
 
         helper1_off = self.get_helper1_main_offset()
         helper1_value = int.from_bytes(dec[helper1_off:helper1_off + 4], "little")
-        helper1_label = HELPER_VALUE_TO_LABEL.get(helper1_value)
+        helper1_label = helper_value_to_label.get(helper1_value)
         if helper1_label is None:
             helper1_label = "不明"
             self._ensure_helper_has_value("helper1", helper1_value, helper1_label)
@@ -630,7 +832,7 @@ class SaveEditorApp:
 
         helper2_off = self.get_helper2_main_offset()
         helper2_value = int.from_bytes(dec[helper2_off:helper2_off + 4], "little")
-        helper2_label = HELPER_VALUE_TO_LABEL.get(helper2_value)
+        helper2_label = helper_value_to_label.get(helper2_value)
         if helper2_label is None:
             helper2_label = "不明"
             self._ensure_helper_has_value("helper2", helper2_value, helper2_label)
@@ -641,7 +843,7 @@ class SaveEditorApp:
             offsets = self.get_input_offsets(action)
             first_value = dec[offsets[0]]
 
-            label = VALUE_TO_LABEL.get(first_value)
+            label = action_value_to_label.get(first_value)
             if label is None:
                 label = "不明"
                 self._ensure_combo_has_value(name, first_value, label)
@@ -673,32 +875,36 @@ class SaveEditorApp:
         try:
             dec = bytearray(self.original_dec)
 
+            preset_label_to_value = self._get_current_preset_label_to_value()
             preset_label = self.preset_var.get()
-            if preset_label not in PRESET_LABEL_TO_VALUE:
+            if preset_label not in preset_label_to_value:
                 raise ValueError("確認/キャンセルの値が不正です。")
-            dec[self.get_preset_offset()] = PRESET_LABEL_TO_VALUE[preset_label]
+            dec[self.get_preset_offset()] = preset_label_to_value[preset_label]
+
+            helper_label_to_value = self._get_helper_label_to_value()
+            action_label_to_value = self._get_current_action_label_to_value()
 
             helper1_label = self.helper1_var.get()
-            if helper1_label not in HELPER_LABEL_TO_VALUE:
+            if helper1_label not in helper_label_to_value:
                 raise ValueError("補助キー1の値が不正です。")
-            helper1_value = HELPER_LABEL_TO_VALUE[helper1_label]
+            helper1_value = helper_label_to_value[helper1_label]
             helper1_off = self.get_helper1_main_offset()
             dec[helper1_off:helper1_off + 4] = helper1_value.to_bytes(4, "little")
 
             helper2_label = self.helper2_var.get()
-            if helper2_label not in HELPER_LABEL_TO_VALUE:
+            if helper2_label not in helper_label_to_value:
                 raise ValueError("補助キー2の値が不正です。")
-            helper2_value = HELPER_LABEL_TO_VALUE[helper2_label]
+            helper2_value = helper_label_to_value[helper2_label]
             helper2_off = self.get_helper2_main_offset()
             dec[helper2_off:helper2_off + 4] = helper2_value.to_bytes(4, "little")
 
             for action in ACTIONS:
                 name = action["name"]
                 selected_label = self.combo_vars[name].get()
-                if selected_label not in LABEL_TO_VALUE:
+                if selected_label not in action_label_to_value:
                     raise ValueError(f"{name} の値が不正です。")
 
-                value = LABEL_TO_VALUE[selected_label]
+                value = action_label_to_value[selected_label]
                 for off in self.get_input_offsets(action):
                     dec[off] = value
 
@@ -725,7 +931,7 @@ class SaveEditorApp:
                 "保存エラー",
                 "保存に失敗しました。入力内容を確認してください。"
             )
-    
+
     def _can_scroll_vertical(self) -> bool:
         bbox = self.canvas.bbox("all")
         if not bbox:
