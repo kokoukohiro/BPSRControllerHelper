@@ -283,10 +283,13 @@ class SaveEditorApp:
         self._last_helper1_display = ""
         self._last_helper2_display = ""
         self._combobox_dropdown_open = False
+        self._active_dropdown_combo: Optional[ttk.Combobox] = None
+        self._dropdown_watch_job = None
 
         self._build_ui()
         self._bind_traces()
         self._bind_mousewheel()
+        self._bind_clear_selection_click()
         self.rescan_detected_saves()
         self.update_save_button_state()
 
@@ -471,23 +474,64 @@ class SaveEditorApp:
         if combo is None:
             return
 
-        combo.configure(postcommand=self._on_combobox_dropdown_open)
+        combo.configure(postcommand=lambda c=combo: self._on_combobox_dropdown_open(c))
         combo.bind("<<ComboboxSelected>>", self._on_combobox_dropdown_close, add="+")
-        combo.bind("<FocusOut>", self._on_combobox_dropdown_close, add="+")
         combo.bind("<Escape>", self._on_combobox_dropdown_close, add="+")
         combo.bind("<Return>", self._on_combobox_dropdown_close, add="+")
         combo.bind("<Tab>", self._on_combobox_dropdown_close, add="+")
-        combo.bind("<Button-1>", self._on_combobox_pre_click, add="+")
 
-    def _on_combobox_pre_click(self, event=None):
-        # クリックで開く可能性があるので一旦閉状態へ
-        self._combobox_dropdown_open = False
-
-    def _on_combobox_dropdown_open(self):
+    def _on_combobox_dropdown_open(self, combo: ttk.Combobox):
+        self._active_dropdown_combo = combo
         self._combobox_dropdown_open = True
+        self._start_dropdown_watch()
+
+    def _start_dropdown_watch(self):
+        if self._dropdown_watch_job is not None:
+            return
+        self._dropdown_watch_job = self.root.after(30, self._watch_active_dropdown)
+
+    def _watch_active_dropdown(self):
+        self._dropdown_watch_job = None
+
+        combo = self._active_dropdown_combo
+        if combo is None:
+            self._combobox_dropdown_open = False
+            return
+
+        try:
+            popdown = self.root.tk.call("ttk::combobox::PopdownWindow", str(combo))
+            is_mapped = self.root.tk.call("winfo", "ismapped", popdown) == 1
+        except tk.TclError:
+            is_mapped = False
+
+        self._combobox_dropdown_open = bool(is_mapped)
+
+        if is_mapped:
+            self._dropdown_watch_job = self.root.after(30, self._watch_active_dropdown)
+        else:
+            self._active_dropdown_combo = None
 
     def _on_combobox_dropdown_close(self, event=None):
         self._combobox_dropdown_open = False
+        self._active_dropdown_combo = None
+
+        if self._dropdown_watch_job is not None:
+            self.root.after_cancel(self._dropdown_watch_job)
+            self._dropdown_watch_job = None
+    
+    def _on_combobox_focusout(self, combo: ttk.Combobox):
+        # ドロップダウンリスト側へフォーカスが移るだけのことがあるので、
+        # その場では閉じた扱いにせず、アイドル時に実際の表示状態を確認する
+        self.root.after_idle(lambda c=combo: self._close_combobox_if_popdown_hidden(c))
+
+    def _close_combobox_if_popdown_hidden(self, combo: ttk.Combobox):
+        try:
+            popdown = self.root.tk.call("ttk::combobox::PopdownWindow", str(combo))
+            is_mapped = self.root.tk.call("winfo", "ismapped", popdown)
+            if is_mapped != 1:
+                self._combobox_dropdown_open = False
+        except tk.TclError:
+            self._combobox_dropdown_open = False
 
     def _on_combobox_mousewheel(self, event):
         if self._combobox_dropdown_open:
@@ -632,6 +676,74 @@ class SaveEditorApp:
         self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
         self.canvas.bind_all("<Button-4>", _on_mousewheel_linux_up)
         self.canvas.bind_all("<Button-5>", _on_mousewheel_linux_down)
+    
+    def _bind_clear_selection_click(self):
+        self.root.bind_all("<Button-1>", self._on_global_left_click, add="+")
+
+    def _on_global_left_click(self, event):
+        widget = event.widget
+
+        # event.widget が文字列で来る場合があるので実ウィジェットへ変換
+        if isinstance(widget, str):
+            try:
+                widget = self.root.nametowidget(widget)
+            except (KeyError, tk.TclError):
+                return
+
+        if widget is None:
+            return
+
+        try:
+            widget_class = widget.winfo_class()
+        except tk.TclError:
+            return
+
+        # 入力系ウィジェットをクリックしたときは何もしない
+        interactive_classes = {
+            "Entry", "TEntry",
+            "Text",
+            "Listbox",
+            "Spinbox",
+            "Combobox", "TCombobox",
+        }
+        if widget_class in interactive_classes:
+            return
+
+        # 少し遅らせて、現在のクリック処理が終わってから選択解除
+        self.root.after_idle(self._clear_all_widget_selection)
+
+    def _clear_all_widget_selection(self):
+        # Entry の選択解除
+        if self.path_entry is not None and self.path_entry.winfo_exists():
+            try:
+                self.path_entry.selection_clear()
+            except tk.TclError:
+                pass
+
+        # Combobox の青い選択解除
+        combo_list = [
+            self.detected_save_combobox,
+            self.controller_combobox,
+            self.helper1_combobox,
+            self.helper2_combobox,
+            self.preset_combobox,
+            *self.action_helper_combos.values(),
+            *self.comboboxes.values(),
+        ]
+
+        for combo in combo_list:
+            if combo is None or not combo.winfo_exists():
+                continue
+            try:
+                combo.selection_clear()
+            except tk.TclError:
+                pass
+
+        # どこにもフォーカスが残らないように root へ戻す
+        try:
+            self.root.focus_set()
+        except tk.TclError:
+            pass
 
     def _is_any_combobox_dropdown_open(self) -> bool:
         return self._combobox_dropdown_open
