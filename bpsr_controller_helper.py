@@ -9,13 +9,17 @@ import brotli
 # キー値テーブル（アクション側 1 byte）
 # =========================
 KEY_OPTIONS = [
+    (1,  "L方向入力"),
+    (3,  "R方向入力"),
     (5,  "L2"),
     (6,  "R2"),
     (7,  "×"),
     (8,  "〇"),
     (10, "□"),
     (11, "△"),
-    (15, "select"),
+    (13, "touchpad"),
+    (14, "option"),
+    (15, "share"),
     (17, "L1"),
     (18, "R1"),
     (19, "L3"),
@@ -29,18 +33,29 @@ VALUE_TO_LABEL = {value: label for value, label in KEY_OPTIONS}
 LABEL_TO_VALUE = {label: value for value, label in KEY_OPTIONS}
 BASE_ACTION_COMBO_VALUES = [label for _, label in KEY_OPTIONS]
 
+ACTION_STATE_SINGLE = 0xFFFFFFFF
+ACTION_STATE_HELPER1 = 0x00000000
+ACTION_STATE_HELPER2 = 0x00000001
+
+ACTION_HELPER_NONE_LABEL = "割り当てなし"
+DETECTED_SAVE_MANUAL_LABEL = "設定ファイルを手動選択しました"
+
 CONTROLLER_OPTIONS = ["PlayStation", "Nintendo", "Xbox"]
 DEFAULT_CONTROLLER = "PlayStation"
 
 CONTROLLER_DISPLAY_MAPS = {
     "PlayStation": {
+        1: "L方向入力",
+        3: "R方向入力",
         5: "L2",
         6: "R2",
         7: "×",
         8: "〇",
         10: "□",
         11: "△",
-        15: "select",
+        13: "touchpad",
+        14: "option",
+        15: "share",
         17: "L1",
         18: "R1",
         19: "L3",
@@ -51,13 +66,17 @@ CONTROLLER_DISPLAY_MAPS = {
         26: "→",
     },
     "Nintendo": {
+        1: "L方向入力",
+        3: "R方向入力",
         5: "ZL",
         6: "ZR",
         7: "B",
         8: "A",
         10: "Y",
         11: "X",
-        15: "select",
+        13: "-",
+        14: "+",
+        15: "capture",
         17: "L",
         18: "R",
         19: "LS",
@@ -68,13 +87,17 @@ CONTROLLER_DISPLAY_MAPS = {
         26: "→",
     },
     "Xbox": {
+        1: "L方向入力",
+        3: "R方向入力",
         5: "LT",
         6: "RT",
         7: "A",
         8: "B",
         10: "X",
         11: "Y",
-        15: "select",
+        13: "view",
+        14: "menu",
+        15: "xbox",
         17: "LB",
         18: "RB",
         19: "LS",
@@ -150,9 +173,17 @@ HELPER_MAIN_TO_ACTION_VALUE = {
 ACTIONS = [
     {"name": "ジャンプ", "rel_offsets": [0x0133]},
     {"name": "ダッシュ/回避", "rel_offsets": [0x01C7]},
+    {"name": "環境共鳴能力1", "rel_offsets": [0x0204]},
+    {"name": "環境共鳴能力2", "rel_offsets": [0x0227]},
     {"name": "通常攻撃", "rel_offsets": [0x027E]},
     {"name": "特殊攻撃", "rel_offsets": [0x09E7]},
+    {"name": "マスタリースキル1", "rel_offsets": [0x02D5]},
+    {"name": "マスタリースキル2", "rel_offsets": [0x0312]},
+    {"name": "マスタリースキル3", "rel_offsets": [0x034F]},
+    {"name": "マスタリースキル4", "rel_offsets": [0x038C]},
     {"name": "究極スキル", "rel_offsets": [0x09AA]},
+    {"name": "バトルイマジン1", "rel_offsets": [0x0A24]},
+    {"name": "バトルイマジン2", "rel_offsets": [0x0A61]},
     {"name": "左でアイテム切り替え", "rel_offsets": [0x102D]},
     {"name": "アイテム使用", "rel_offsets": [0x03C9]},
     {"name": "右でアイテム切り替え", "rel_offsets": [0x106A]},
@@ -160,14 +191,34 @@ ACTIONS = [
     {"name": "ロックオン/切り替え", "rel_offsets": [0x0406]},
     {"name": "エクストラスキル", "rel_offsets": [0x0A9E]},
     {"name": "インタラクト解除", "rel_offsets": [0x045D]},
+    {"name": "クエスト追跡", "rel_offsets": [0x0514]},
+    {"name": "UI非表示", "rel_offsets": [0x04D7]},
     {"name": "クエストアイテムのクイック使用", "rel_offsets": [0x049A]},
+    {"name": "マップON/OFF", "rel_offsets": [0x0690]},
+    {"name": "クエスト", "rel_offsets": [0x06CD]},
+    {"name": "ソーシャルモード", "rel_offsets": [0x070A]},
+    {"name": "メニューを開く", "rel_offsets": [0x084D]},
+    {"name": "撮影", "rel_offsets": [0x076A]},
+    {"name": "ダンジョン退出", "rel_offsets": [0x0810]},
     {"name": "アイテムを使用", "rel_offsets": [0x090D, 0x186B]},
+    {"name": "クイック操作", "rel_offsets": [0x0BA4]},
+    {"name": "乗り物召喚/解除", "rel_offsets": [0x0B44]},
+    {"name": "招待承認", "rel_offsets": [0x0BE1, 0x1A89]},
+    {"name": "招待拒否", "rel_offsets": [0x0C1E, 0x1AC6]},
+    {"name": "オートバトル", "rel_offsets": [0x0CBB]},
+    {"name": "チャンネル", "rel_offsets": [0x0C7E]},
+    {"name": "イラストガイド", "rel_offsets": [0x0CF8]},
     {"name": "クイックホイール", "rel_offsets": [0x0D35]},
+    {"name": "クエスト切り替え（左）", "rel_offsets": [0x0FB3]},
+    {"name": "クエスト切り替え（右）", "rel_offsets": [0x0FD6]},
+    {"name": "ズームアウト", "rel_offsets": [0x058E]},
+    {"name": "ズームイン", "rel_offsets": [0x05A3]},
     {"name": "スキルパレットを開く", "rel_offsets": [0x1227, 0x1F7D]},
     {"name": "ロールスキル1", "rel_offsets": [0x1133]},
     {"name": "ロールスキル2", "rel_offsets": [0x1170]},
     {"name": "ロールスキル3", "rel_offsets": [0x11AD]},
     {"name": "ロールスキル4", "rel_offsets": [0x11EA]},
+    {"name": "ホーム設計図", "rel_offsets": [0x124A]},
 ]
 
 
@@ -200,8 +251,13 @@ class SaveEditorApp:
 
         self.combo_vars: dict[str, tk.StringVar] = {}
         self.comboboxes: dict[str, ttk.Combobox] = {}
+        self.action_helper_vars: dict[str, tk.StringVar] = {}
+        self.action_helper_combos: dict[str, ttk.Combobox] = {}
+
 
         self.path_var = tk.StringVar()
+        self.detected_save_var = tk.StringVar()
+        self.detected_saves: list[tuple[str, Path]] = []
         self.status_var = tk.StringVar(value="ファイル未選択")
         self.base_status_message = "ファイル未選択"
 
@@ -214,17 +270,24 @@ class SaveEditorApp:
         self.helper1_combobox: Optional[ttk.Combobox] = None
         self.helper2_combobox: Optional[ttk.Combobox] = None
         self.controller_combobox: Optional[ttk.Combobox] = None
+        self.detected_save_combobox: Optional[ttk.Combobox] = None
         self.path_entry: Optional[ttk.Entry] = None
+        self.rescan_button: Optional[ttk.Button] = None
+        self.manual_select_button: Optional[ttk.Button] = None
 
         self.reset_button: Optional[ttk.Button] = None
         self.save_button: Optional[ttk.Button] = None
 
         self._suspend_events = False
         self._last_controller_type = self.controller_var.get()
+        self._last_helper1_display = ""
+        self._last_helper2_display = ""
+        self._combobox_dropdown_open = False
 
         self._build_ui()
         self._bind_traces()
         self._bind_mousewheel()
+        self.rescan_detected_saves()
         self.update_save_button_state()
 
     def _build_ui(self):
@@ -261,41 +324,36 @@ class SaveEditorApp:
         row = 0
 
         # frame 1: ファイル選択
-        file_group = ttk.LabelFrame(self.content, text="ファイル選択", padding=8)
+        file_group = ttk.LabelFrame(self.content, text="設定ファイルを選択", padding=8)
         file_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         file_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 2: コントローラ種別
-        controller_group = ttk.LabelFrame(self.content, text="コントローラ", padding=8)
+        # frame 2: 検出された設定ファイル
+        detected_group = ttk.LabelFrame(self.content, text="検出された設定ファイル", padding=8)
+        detected_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        detected_group.columnconfigure(0, weight=1)
+        row += 1
+
+        # frame 3: コントローラ種別
+        controller_group = ttk.LabelFrame(self.content, text="コントローラを選択", padding=8)
         controller_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         controller_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 3: 補助キー + 確認/キャンセル
+        # frame 4: 補助キー + 確認/キャンセル
         keybind_group = ttk.LabelFrame(self.content, text="ボタン配置", padding=8)
         keybind_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         keybind_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 4: アクション一覧
+        # frame 5: アクション一覧
         action_group = ttk.LabelFrame(self.content, text="ボタン配置", padding=8)
         action_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         action_group.columnconfigure(0, weight=1)
         row += 1
 
-        # コントローラ種別
-        self.controller_combobox = self._add_top_combo_row(
-            parent=controller_group,
-            row=0,
-            label="コントローラを選択",
-            variable=self.controller_var,
-            values=CONTROLLER_OPTIONS,
-            width=10,
-            pady=(0, 0),
-        )
-
-        # ファイル選択
+        # ファイル選択（最古版ベース、ボタン文言だけ変更）
         file_row = ttk.Frame(file_group)
         file_row.grid(row=0, column=0, sticky="ew")
         file_row.columnconfigure(0, weight=1)
@@ -303,7 +361,8 @@ class SaveEditorApp:
         self.path_entry = ttk.Entry(file_row, textvariable=self.path_var)
         self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
 
-        ttk.Button(file_row, text="選択", command=self.select_file).grid(row=0, column=1, sticky="e")
+        self.manual_select_button = ttk.Button(file_row, text="手動選択", command=self.select_file)
+        self.manual_select_button.grid(row=0, column=1, sticky="e")
 
         ttk.Label(
             file_group,
@@ -314,6 +373,39 @@ class SaveEditorApp:
             ),
             justify="left"
         ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+
+        # 検出された設定ファイル
+        detected_row = ttk.Frame(detected_group)
+        detected_row.grid(row=0, column=0, sticky="ew")
+        detected_row.columnconfigure(0, weight=1)
+
+        self.detected_save_combobox = ttk.Combobox(
+            detected_row,
+            textvariable=self.detected_save_var,
+            state="readonly",
+            justify="left",
+        )
+        self.detected_save_combobox.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+        self.detected_save_combobox.bind("<<ComboboxSelected>>", self._on_detected_save_selected)
+        self._register_combobox_bindings(self.detected_save_combobox)
+
+        self.rescan_button = ttk.Button(detected_row, text="再スキャン", command=self.rescan_detected_saves)
+        self.rescan_button.grid(row=0, column=1, sticky="e")
+
+        # コントローラ種別（左テキストなし）
+        controller_row = ttk.Frame(controller_group)
+        controller_row.grid(row=0, column=0, sticky="ew", pady=(0, 0))
+        controller_row.columnconfigure(0, weight=1)
+
+        self.controller_combobox = ttk.Combobox(
+            controller_row,
+            textvariable=self.controller_var,
+            values=CONTROLLER_OPTIONS,
+            state="readonly",
+            justify="left",
+        )
+        self.controller_combobox.grid(row=0, column=0, sticky="ew")
+        self._register_combobox_bindings(self.controller_combobox)
 
         sub_row = 0
 
@@ -373,6 +465,60 @@ class SaveEditorApp:
         self.reset_button = ttk.Button(button_frame, text="リセット", command=self.reset_values, state="disabled")
         self.reset_button.pack(side="right", padx=(0, 8))
 
+        self.root.bind_class("TCombobox", "<MouseWheel>", self._on_combobox_mousewheel)
+
+    def _register_combobox_bindings(self, combo: ttk.Combobox):
+        if combo is None:
+            return
+
+        combo.configure(postcommand=self._on_combobox_dropdown_open)
+        combo.bind("<<ComboboxSelected>>", self._on_combobox_dropdown_close, add="+")
+        combo.bind("<FocusOut>", self._on_combobox_dropdown_close, add="+")
+        combo.bind("<Escape>", self._on_combobox_dropdown_close, add="+")
+        combo.bind("<Return>", self._on_combobox_dropdown_close, add="+")
+        combo.bind("<Tab>", self._on_combobox_dropdown_close, add="+")
+        combo.bind("<Button-1>", self._on_combobox_pre_click, add="+")
+
+    def _on_combobox_pre_click(self, event=None):
+        # クリックで開く可能性があるので一旦閉状態へ
+        self._combobox_dropdown_open = False
+
+    def _on_combobox_dropdown_open(self):
+        self._combobox_dropdown_open = True
+
+    def _on_combobox_dropdown_close(self, event=None):
+        self._combobox_dropdown_open = False
+
+    def _on_combobox_mousewheel(self, event):
+        if self._combobox_dropdown_open:
+            return "break"
+
+        if not self._can_scroll_vertical():
+            return "break"
+
+        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        return "break"
+
+    def _on_combobox_mousewheel_linux_up(self, event):
+        if self._combobox_dropdown_open:
+            return "break"
+
+        if not self._can_scroll_vertical():
+            return "break"
+
+        self.canvas.yview_scroll(-1, "units")
+        return "break"
+
+    def _on_combobox_mousewheel_linux_down(self, event):
+        if self._combobox_dropdown_open:
+            return "break"
+
+        if not self._can_scroll_vertical():
+            return "break"
+
+        self.canvas.yview_scroll(1, "units")
+        return "break"
+
     def _add_top_combo_row(
         self,
         parent: ttk.Frame,
@@ -398,6 +544,7 @@ class SaveEditorApp:
             justify="right",
         )
         combo.grid(row=0, column=1, sticky="e")
+        self._register_combobox_bindings(combo)
         return combo
 
     def _add_action_row(self, parent: ttk.Frame, row: int, action: dict):
@@ -406,6 +553,19 @@ class SaveEditorApp:
         frame.columnconfigure(0, weight=1)
 
         ttk.Label(frame, text=action["name"]).grid(row=0, column=0, sticky="w")
+
+        helper_var = tk.StringVar()
+        helper_combo = ttk.Combobox(
+            frame,
+            textvariable=helper_var,
+            values=self._get_action_helper_display_values(),
+            state="readonly",
+            width=10,
+            justify="right",
+        )
+        helper_combo.grid(row=0, column=1, sticky="e", padx=(8, 4))
+
+        ttk.Label(frame, text="+").grid(row=0, column=2, sticky="e", padx=(0, 4))
 
         var = tk.StringVar()
         combo = ttk.Combobox(
@@ -416,8 +576,13 @@ class SaveEditorApp:
             width=10,
             justify="right",
         )
-        combo.grid(row=0, column=1, sticky="e")
+        combo.grid(row=0, column=3, sticky="e")
 
+        self._register_combobox_bindings(helper_combo)
+        self._register_combobox_bindings(combo)
+
+        self.action_helper_vars[action["name"]] = helper_var
+        self.action_helper_combos[action["name"]] = helper_combo
         self.combo_vars[action["name"]] = var
         self.comboboxes[action["name"]] = combo
 
@@ -432,6 +597,10 @@ class SaveEditorApp:
 
     def _bind_mousewheel(self):
         def _on_mousewheel(event):
+            # Combobox のドロップダウンが開いている間は、親画面をスクロールしない
+            if self._combobox_dropdown_open:
+                return "break"
+
             if not self._can_scroll_vertical():
                 return "break"
             if self.canvas.winfo_exists():
@@ -439,6 +608,10 @@ class SaveEditorApp:
                 return "break"
 
         def _on_mousewheel_linux_up(event):
+            # Combobox のドロップダウンが開いている間は、親画面をスクロールしない
+            if self._combobox_dropdown_open:
+                return "break"
+
             if not self._can_scroll_vertical():
                 return "break"
             if self.canvas.winfo_exists():
@@ -446,6 +619,10 @@ class SaveEditorApp:
                 return "break"
 
         def _on_mousewheel_linux_down(event):
+            # Combobox のドロップダウンが開いている間は、親画面をスクロールしない
+            if self._combobox_dropdown_open:
+                return "break"
+
             if not self._can_scroll_vertical():
                 return "break"
             if self.canvas.winfo_exists():
@@ -455,6 +632,9 @@ class SaveEditorApp:
         self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
         self.canvas.bind_all("<Button-4>", _on_mousewheel_linux_up)
         self.canvas.bind_all("<Button-5>", _on_mousewheel_linux_down)
+
+    def _is_any_combobox_dropdown_open(self) -> bool:
+        return self._combobox_dropdown_open
 
     def find_anchor(self, dec: bytes, anchor: bytes) -> int:
         pos = dec.find(anchor)
@@ -537,6 +717,47 @@ class SaveEditorApp:
         helper_map = self._get_helper_value_to_label()
         return {label: value for value, label in helper_map.items()}
 
+    def _get_action_helper_display_values(self) -> list[str]:
+        values = [ACTION_HELPER_NONE_LABEL]
+        helper1_label = self.helper1_var.get()
+        helper2_label = self.helper2_var.get()
+        if helper1_label:
+            values.append(helper1_label)
+        if helper2_label and helper2_label not in values:
+            values.append(helper2_label)
+        return values
+
+    def _get_action_helper_display_to_state(self) -> dict[str, int]:
+        mapping = {ACTION_HELPER_NONE_LABEL: ACTION_STATE_SINGLE}
+        helper1_label = self.helper1_var.get()
+        helper2_label = self.helper2_var.get()
+        if helper1_label:
+            mapping[helper1_label] = ACTION_STATE_HELPER1
+        if helper2_label:
+            mapping[helper2_label] = ACTION_STATE_HELPER2
+        return mapping
+
+    def _refresh_action_helper_combobox_choices(self, old_helper1_label: Optional[str] = None, old_helper2_label: Optional[str] = None):
+        new_values = self._get_action_helper_display_values()
+        new_helper1_label = self.helper1_var.get()
+        new_helper2_label = self.helper2_var.get()
+
+        for name, combo in self.action_helper_combos.items():
+            current = self.action_helper_vars[name].get()
+
+            if old_helper1_label is not None and current == old_helper1_label:
+                current = new_helper1_label
+            elif old_helper2_label is not None and current == old_helper2_label:
+                current = new_helper2_label
+
+            combo["values"] = list(new_values)
+            if current not in new_values:
+                current = ACTION_HELPER_NONE_LABEL
+            self.action_helper_vars[name].set(current)
+
+        self._last_helper1_display = new_helper1_label
+        self._last_helper2_display = new_helper2_label
+
     def _get_blocked_action_values(self) -> set[int]:
         blocked = set()
         helper_label_to_value = self._get_helper_label_to_value()
@@ -577,6 +798,9 @@ class SaveEditorApp:
     def _refresh_controller_dependent_labels(self):
         old_controller = self._last_controller_type
         new_controller = self.controller_var.get() or DEFAULT_CONTROLLER
+
+        old_helper1_label = self.helper1_var.get()
+        old_helper2_label = self.helper2_var.get()
 
         old_action_value_to_label = CONTROLLER_DISPLAY_MAPS.get(old_controller, CONTROLLER_DISPLAY_MAPS[DEFAULT_CONTROLLER])
         old_action_label_to_value = {label: value for value, label in old_action_value_to_label.items()}
@@ -630,6 +854,10 @@ class SaveEditorApp:
             self.preset_combobox["values"] = values
 
         self._refresh_action_combobox_choices()
+        self._refresh_action_helper_combobox_choices(
+            old_helper1_label=old_helper1_label,
+            old_helper2_label=old_helper2_label,
+        )
         self._last_controller_type = new_controller
 
     def _on_any_value_changed(self, *args):
@@ -676,6 +904,8 @@ class SaveEditorApp:
         if self._suspend_events:
             return
 
+        old_helper1_label = self._last_helper1_display
+
         self._suspend_events = True
         try:
             label = self.helper1_var.get()
@@ -684,6 +914,10 @@ class SaveEditorApp:
                 if value is not None:
                     self._clear_conflicts_for_helper_value(value, other_helper="helper2")
             self._refresh_action_combobox_choices()
+            self._refresh_action_helper_combobox_choices(
+                old_helper1_label=old_helper1_label,
+                old_helper2_label=None,
+            )
         finally:
             self._suspend_events = False
 
@@ -693,6 +927,8 @@ class SaveEditorApp:
         if self._suspend_events:
             return
 
+        old_helper2_label = self._last_helper2_display
+
         self._suspend_events = True
         try:
             label = self.helper2_var.get()
@@ -701,6 +937,10 @@ class SaveEditorApp:
                 if value is not None:
                     self._clear_conflicts_for_helper_value(value, other_helper="helper1")
             self._refresh_action_combobox_choices()
+            self._refresh_action_helper_combobox_choices(
+                old_helper1_label=None,
+                old_helper2_label=old_helper2_label,
+            )
         finally:
             self._suspend_events = False
 
@@ -725,7 +965,7 @@ class SaveEditorApp:
 
     def update_status_message(self):
         if self.file_path is None:
-            self.status_var.set("ファイル未選択")
+            self.status_var.set(self.base_status_message)
             return
 
         if self.has_blank_required_fields():
@@ -747,7 +987,7 @@ class SaveEditorApp:
         default_dir = self._resolve_default_open_dir()
 
         dialog_kwargs = {
-            "title": "セーブデータを選択",
+            "title": "設定ファイルを選択",
             "filetypes": [("Bytes files", "*.bytes")],
         }
 
@@ -761,8 +1001,119 @@ class SaveEditorApp:
         if not path:
             return
 
+        self._load_file(
+            Path(path),
+            error_title="読み込みエラー",
+            success_message="読み込み完了",
+            sync_detected_selection=False,
+        )
+
+    def _scan_save_files(self) -> list[tuple[str, Path]]:
+        results: list[tuple[str, Path]] = []
+        bokura_root = Path.home() / "AppData" / "LocalLow" / "bokura"
+
+        if not bokura_root.is_dir():
+            return results
+
+        for version_dir in bokura_root.iterdir():
+            if not version_dir.is_dir():
+                continue
+
+            env1_root = version_dir / "localsave" / "Env1"
+            if not env1_root.is_dir():
+                continue
+
+            for level1_dir in env1_root.iterdir():
+                if not level1_dir.is_dir():
+                    continue
+
+                uid_dirs = [p for p in level1_dir.iterdir() if p.is_dir()]
+                if len(uid_dirs) != 1:
+                    continue
+
+                uid_dir = uid_dirs[0]
+                save_file = uid_dir / "localsave.bytes"
+                if not save_file.is_file():
+                    continue
+
+                try:
+                    if save_file.stat().st_size < 2048:
+                        continue
+                except OSError:
+                    continue
+
+                label = f"{version_dir.name}-UID:{uid_dir.name}"
+                results.append((label, save_file))
+
+        results.sort(key=lambda item: item[0].lower())
+        return results
+
+    def rescan_detected_saves(self):
+        current_label = self.detected_save_var.get()
+        self.detected_saves = self._scan_save_files()
+
+        if self.detected_save_combobox is not None:
+            self.detected_save_combobox["values"] = [label for label, _ in self.detected_saves]
+
+        if not self.detected_saves:
+            self.detected_save_var.set("")
+            self.base_status_message = "設定ファイルが見つかりません、手動選択してください"
+            self.update_save_button_state()
+            return
+
+        selected_label = None
+        if current_label and any(label == current_label for label, _ in self.detected_saves):
+            selected_label = current_label
+        elif self.file_path is not None:
+            try:
+                current_path = self.file_path.resolve()
+            except OSError:
+                current_path = self.file_path
+            for label, path in self.detected_saves:
+                try:
+                    candidate_path = path.resolve()
+                except OSError:
+                    candidate_path = path
+                if candidate_path == current_path:
+                    selected_label = label
+                    break
+
+        if selected_label is None:
+            selected_label = self.detected_saves[0][0]
+
+        self.detected_save_var.set(selected_label)
+        self._load_detected_save_by_label(
+            selected_label,
+            show_error=False,
+            success_message=f"{len(self.detected_saves)}件の設定ファイルを検出、{selected_label}を選択中",
+        )
+
+    def _on_detected_save_selected(self, event=None):
+        selected_label = self.detected_save_var.get()
+        if not selected_label or selected_label == DETECTED_SAVE_MANUAL_LABEL:
+            return
+
+        self._load_detected_save_by_label(
+            selected_label,
+            show_error=True,
+            success_message=f"{selected_label}を読み込み完了",
+        )
+
+    def _load_detected_save_by_label(self, label: str, show_error: bool, success_message: Optional[str] = None):
+        for detected_label, path in self.detected_saves:
+            if detected_label == label:
+                error_title = "読み込みエラー" if show_error else None
+                self._load_file(path, error_title=error_title, success_message=success_message)
+                return
+
+    def _load_file(
+        self,
+        file_path: Path,
+        error_title: Optional[str],
+        success_message: Optional[str] = None,
+        sync_detected_selection: bool = True,
+    ):
         try:
-            file_path = Path(path)
             raw = file_path.read_bytes()
             dec = brotli.decompress(raw)
 
@@ -785,17 +1136,27 @@ class SaveEditorApp:
             self.original_dec = dec
             self.path_var.set(str(file_path))
 
+            if sync_detected_selection:
+                matching_label = self._find_detected_label_by_path(file_path)
+                if matching_label is not None:
+                    self.detected_save_var.set(matching_label)
+                else:
+                    self.detected_save_var.set(DETECTED_SAVE_MANUAL_LABEL)
+            else:
+                self.detected_save_var.set(DETECTED_SAVE_MANUAL_LABEL)
+
             self._suspend_events = True
             try:
                 self._load_values_from_dec(dec)
                 self._refresh_action_combobox_choices()
+                self._refresh_action_helper_combobox_choices()
             finally:
                 self._suspend_events = False
 
             if self.reset_button is not None:
                 self.reset_button.config(state="normal")
 
-            self.base_status_message = "読み込み完了"
+            self.base_status_message = success_message or "読み込み完了"
             self.update_save_button_state()
 
         except Exception:
@@ -804,10 +1165,26 @@ class SaveEditorApp:
             self.path_var.set("")
             self.base_status_message = "読み込み失敗"
             self.update_save_button_state()
-            messagebox.showerror(
-                "読み込みエラー",
-                "ファイルの読み込みに失敗しました。\n対応していないファイルか、データが破損している可能性があります。"
-            )
+            if error_title:
+                messagebox.showerror(
+                    error_title,
+                    "ファイルの読み込みに失敗しました。\n対応していないファイルか、データが破損している可能性があります。"
+                )
+
+    def _find_detected_label_by_path(self, file_path: Path) -> Optional[str]:
+        try:
+            target = file_path.resolve()
+        except OSError:
+            target = file_path
+
+        for label, path in self.detected_saves:
+            try:
+                if path.resolve() == target:
+                    return label
+            except OSError:
+                if path == target:
+                    return label
+        return None
 
     def _load_values_from_dec(self, dec: bytes):
         action_value_to_label = self._get_current_action_value_to_label()
@@ -838,16 +1215,33 @@ class SaveEditorApp:
             self._ensure_helper_has_value("helper2", helper2_value, helper2_label)
         self.helper2_var.set(helper2_label)
 
+        action_helper_values = self._get_action_helper_display_values()
+
         for action in ACTIONS:
             name = action["name"]
             offsets = self.get_input_offsets(action)
-            first_value = dec[offsets[0]]
+            first_off = offsets[0]
+            first_value = int.from_bytes(dec[first_off:first_off + 4], "little")
+            state_dword = int.from_bytes(dec[first_off + 4:first_off + 8], "little")
 
             label = action_value_to_label.get(first_value)
             if label is None:
                 label = "不明"
                 self._ensure_combo_has_value(name, first_value, label)
 
+            if state_dword == ACTION_STATE_SINGLE:
+                helper_label = ACTION_HELPER_NONE_LABEL
+            elif state_dword == ACTION_STATE_HELPER1:
+                helper_label = self.helper1_var.get()
+            elif state_dword == ACTION_STATE_HELPER2:
+                helper_label = self.helper2_var.get()
+            else:
+                helper_label = ACTION_HELPER_NONE_LABEL
+
+            if helper_label not in action_helper_values:
+                helper_label = ACTION_HELPER_NONE_LABEL
+
+            self.action_helper_vars[name].set(helper_label)
             self.combo_vars[name].set(label)
 
     def reset_values(self):
@@ -883,6 +1277,7 @@ class SaveEditorApp:
 
             helper_label_to_value = self._get_helper_label_to_value()
             action_label_to_value = self._get_current_action_label_to_value()
+            action_helper_display_to_state = self._get_action_helper_display_to_state()
 
             helper1_label = self.helper1_var.get()
             if helper1_label not in helper_label_to_value:
@@ -904,9 +1299,16 @@ class SaveEditorApp:
                 if selected_label not in action_label_to_value:
                     raise ValueError(f"{name} の値が不正です。")
 
+                helper_display = self.action_helper_vars[name].get()
+                if helper_display not in action_helper_display_to_state:
+                    raise ValueError(f"{name} の補助キー設定が不正です。")
+
                 value = action_label_to_value[selected_label]
+                state_dword = action_helper_display_to_state[helper_display]
+
                 for off in self.get_input_offsets(action):
-                    dec[off] = value
+                    dec[off:off + 4] = value.to_bytes(4, "little")
+                    dec[off + 4:off + 8] = state_dword.to_bytes(4, "little")
 
             enc = brotli.compress(bytes(dec), quality=1)
             self.file_path.write_bytes(enc)
@@ -917,6 +1319,7 @@ class SaveEditorApp:
             try:
                 self._load_values_from_dec(self.original_dec)
                 self._refresh_action_combobox_choices()
+                self._refresh_action_helper_combobox_choices()
             finally:
                 self._suspend_events = False
 
