@@ -209,6 +209,9 @@ ACTIONS = [
     {"name": "チャンネル", "rel_offsets": [0x0C7E]},
     {"name": "イラストガイド", "rel_offsets": [0x0CF8]},
     {"name": "クイックホイール", "rel_offsets": [0x0D35]},
+    {"name": "クイックホイール切替（左）", "rel_offsets": [0x2856]},
+    {"name": "クイックホイール切替（右）", "rel_offsets": [0x286B]},
+    {"name": "クイックホイール編集", "rel_offsets": [0x28A8]},
     {"name": "クエスト切り替え（左）", "rel_offsets": [0x0FB3]},
     {"name": "クエスト切り替え（右）", "rel_offsets": [0x0FD6]},
     {"name": "ズームアウト", "rel_offsets": [0x058E]},
@@ -220,6 +223,12 @@ ACTIONS = [
     {"name": "ロールスキル4", "rel_offsets": [0x11EA]},
     {"name": "ホーム設計図", "rel_offsets": [0x124A]},
 ]
+
+SPECIAL_ACTIONS_WITHOUT_HELPER = {
+    "クイックホイール切替（左）",
+    "クイックホイール切替（右）",
+    "クイックホイール編集",
+}
 
 
 class SaveEditorApp:
@@ -596,39 +605,55 @@ class SaveEditorApp:
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 4))
         frame.columnconfigure(0, weight=1)
 
-        ttk.Label(frame, text=action["name"]).grid(row=0, column=0, sticky="w")
+        action_name = action["name"]
+        uses_helper_ui = self._action_name_uses_helper_ui(action_name)
 
-        helper_var = tk.StringVar()
-        helper_combo = ttk.Combobox(
-            frame,
-            textvariable=helper_var,
-            values=self._get_action_helper_display_values(),
-            state="readonly",
-            width=10,
-            justify="right",
-        )
-        helper_combo.grid(row=0, column=1, sticky="e", padx=(8, 4))
+        ttk.Label(frame, text=action_name).grid(row=0, column=0, sticky="w")
 
-        ttk.Label(frame, text="+").grid(row=0, column=2, sticky="e", padx=(0, 4))
-
+        helper_var = tk.StringVar(value=ACTION_HELPER_NONE_LABEL)
         var = tk.StringVar()
-        combo = ttk.Combobox(
-            frame,
-            textvariable=var,
-            values=list(BASE_ACTION_COMBO_VALUES),
-            state="readonly",
-            width=10,
-            justify="right",
-        )
-        combo.grid(row=0, column=3, sticky="e")
 
-        self._register_combobox_bindings(helper_combo)
+        if uses_helper_ui:
+            helper_combo = ttk.Combobox(
+                frame,
+                textvariable=helper_var,
+                values=self._get_action_helper_display_values(),
+                state="readonly",
+                width=10,
+                justify="right",
+            )
+            helper_combo.grid(row=0, column=1, sticky="e", padx=(8, 4))
+
+            ttk.Label(frame, text="+").grid(row=0, column=2, sticky="e", padx=(0, 4))
+
+            combo = ttk.Combobox(
+                frame,
+                textvariable=var,
+                values=list(BASE_ACTION_COMBO_VALUES),
+                state="readonly",
+                width=10,
+                justify="right",
+            )
+            combo.grid(row=0, column=3, sticky="e")
+
+            self._register_combobox_bindings(helper_combo)
+            self.action_helper_combos[action_name] = helper_combo
+        else:
+            combo = ttk.Combobox(
+                frame,
+                textvariable=var,
+                values=list(BASE_ACTION_COMBO_VALUES),
+                state="readonly",
+                width=10,
+                justify="right",
+            )
+            combo.grid(row=0, column=1, columnspan=3, sticky="e")
+
         self._register_combobox_bindings(combo)
 
-        self.action_helper_vars[action["name"]] = helper_var
-        self.action_helper_combos[action["name"]] = helper_combo
-        self.combo_vars[action["name"]] = var
-        self.comboboxes[action["name"]] = combo
+        self.action_helper_vars[action_name] = helper_var
+        self.combo_vars[action_name] = var
+        self.comboboxes[action_name] = combo
 
     def _bind_traces(self):
         self.controller_var.trace_add("write", self._on_controller_changed)
@@ -758,6 +783,12 @@ class SaveEditorApp:
         if self.input_anchor_pos is None:
             raise ValueError("入力設定が読み込まれていません。")
         return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
+
+    def _action_name_uses_helper_ui(self, action_name: str) -> bool:
+        return action_name not in SPECIAL_ACTIONS_WITHOUT_HELPER
+
+    def _action_allows_blocked_values(self, action_name: str) -> bool:
+        return action_name in SPECIAL_ACTIONS_WITHOUT_HELPER
 
     def get_preset_offset(self) -> int:
         if self.preset_anchor_pos is None:
@@ -894,7 +925,11 @@ class SaveEditorApp:
         blocked_values = self._get_blocked_action_values()
         value_to_label = self._get_current_action_value_to_label()
 
-        allowed_labels = [
+        all_labels = [
+            value_to_label[value]
+            for value, _ in KEY_OPTIONS
+        ]
+        blocked_filtered_labels = [
             value_to_label[value]
             for value, _ in KEY_OPTIONS
             if value not in blocked_values
@@ -902,7 +937,10 @@ class SaveEditorApp:
 
         for name, combo in self.comboboxes.items():
             current = self.combo_vars[name].get()
-            values = list(allowed_labels)
+            if self._action_allows_blocked_values(name):
+                values = list(all_labels)
+            else:
+                values = list(blocked_filtered_labels)
             if current and current not in values:
                 values.append(current)
             combo["values"] = values
@@ -985,7 +1023,9 @@ class SaveEditorApp:
         action_label_to_value = self._get_current_action_label_to_value()
         helper_label_to_value = self._get_helper_label_to_value()
 
-        for var in self.combo_vars.values():
+        for action_name, var in self.combo_vars.items():
+            if self._action_allows_blocked_values(action_name):
+                continue
             label = var.get()
             if not label:
                 continue
@@ -1341,7 +1381,9 @@ class SaveEditorApp:
                 label = "不明"
                 self._ensure_combo_has_value(name, first_value, label)
 
-            if state_dword == ACTION_STATE_SINGLE:
+            if not self._action_name_uses_helper_ui(name):
+                helper_label = ACTION_HELPER_NONE_LABEL
+            elif state_dword == ACTION_STATE_SINGLE:
                 helper_label = ACTION_HELPER_NONE_LABEL
             elif state_dword == ACTION_STATE_HELPER1:
                 helper_label = self.helper1_var.get()
@@ -1411,12 +1453,15 @@ class SaveEditorApp:
                 if selected_label not in action_label_to_value:
                     raise ValueError(f"{name} の値が不正です。")
 
-                helper_display = self.action_helper_vars[name].get()
-                if helper_display not in action_helper_display_to_state:
-                    raise ValueError(f"{name} の補助キー設定が不正です。")
+                if self._action_name_uses_helper_ui(name):
+                    helper_display = self.action_helper_vars[name].get()
+                    if helper_display not in action_helper_display_to_state:
+                        raise ValueError(f"{name} の補助キー設定が不正です。")
+                    state_dword = action_helper_display_to_state[helper_display]
+                else:
+                    state_dword = ACTION_STATE_SINGLE
 
                 value = action_label_to_value[selected_label]
-                state_dword = action_helper_display_to_state[helper_display]
 
                 for off in self.get_input_offsets(action):
                     dec[off:off + 4] = value.to_bytes(4, "little")
