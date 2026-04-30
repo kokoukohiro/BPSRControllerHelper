@@ -116,6 +116,13 @@ CONTROLLER_DISPLAY_MAPS = {
 INPUT_ANCHOR = b"BKRInputConfigData"
 PRESET_ANCHOR = b"BKL_SETID_7001"
 PRESET_REL_OFFSET = 0x17
+PRESET_DEFAULT_VALUE = 0x01
+PRESET_UNAVAILABLE_TITLE = "確認/キャンセルは編集できません"
+PRESET_UNAVAILABLE_MESSAGE = (
+    "この設定ファイルでは、確認/キャンセル設定がゲーム内でまだ一度も編集されていないため、"
+    "このツールでは確認/キャンセルを編集できません。\n"
+    "ほかの項目はそのまま編集できます。"
+)
 
 
 # =========================
@@ -257,6 +264,7 @@ class SaveEditorApp:
 
         self.input_anchor_pos: Optional[int] = None
         self.preset_anchor_pos: Optional[int] = None
+        self._preset_supported = True
 
         self.combo_vars: dict[str, tk.StringVar] = {}
         self.comboboxes: dict[str, ttk.Combobox] = {}
@@ -790,6 +798,18 @@ class SaveEditorApp:
     def _action_allows_blocked_values(self, action_name: str) -> bool:
         return action_name in SPECIAL_ACTIONS_WITHOUT_HELPER
 
+    def _get_default_preset_label(self) -> str:
+        preset_value_to_label = self._get_current_preset_value_to_label()
+        return preset_value_to_label.get(PRESET_DEFAULT_VALUE, next(iter(preset_value_to_label.values())))
+
+    def _update_preset_editability(self):
+        if self.preset_combobox is None:
+            return
+        self.preset_combobox.configure(state="readonly" if self._preset_supported else "disabled")
+
+    def _show_preset_unavailable_error(self):
+        messagebox.showerror(PRESET_UNAVAILABLE_TITLE, PRESET_UNAVAILABLE_MESSAGE)
+
     def get_preset_offset(self) -> int:
         if self.preset_anchor_pos is None:
             raise ValueError("確認/キャンセル設定が読み込まれていません。")
@@ -1008,6 +1028,9 @@ class SaveEditorApp:
             old_helper1_label=old_helper1_label,
             old_helper2_label=old_helper2_label,
         )
+        if not self._preset_supported:
+            self.preset_var.set(self._get_default_preset_label())
+        self._update_preset_editability()
         self._last_controller_type = new_controller
 
     def _on_any_value_changed(self, *args):
@@ -1158,6 +1181,7 @@ class SaveEditorApp:
             error_title="読み込みエラー",
             success_message="読み込み完了",
             sync_detected_selection=False,
+            show_preset_unavailable_warning=True,
         )
 
     def _scan_save_files(self) -> list[tuple[str, Path]]:
@@ -1238,6 +1262,7 @@ class SaveEditorApp:
             selected_label,
             show_error=False,
             success_message=f"{len(self.detected_saves)}件の設定ファイルを検出、{selected_label}を選択中",
+            show_preset_unavailable_warning=False,
         )
 
     def _on_detected_save_selected(self, event=None):
@@ -1249,13 +1274,25 @@ class SaveEditorApp:
             selected_label,
             show_error=True,
             success_message=f"{selected_label}を読み込み完了",
+            show_preset_unavailable_warning=True,
         )
 
-    def _load_detected_save_by_label(self, label: str, show_error: bool, success_message: Optional[str] = None):
+    def _load_detected_save_by_label(
+        self,
+        label: str,
+        show_error: bool,
+        success_message: Optional[str] = None,
+        show_preset_unavailable_warning: bool = False,
+    ):
         for detected_label, path in self.detected_saves:
             if detected_label == label:
                 error_title = "読み込みエラー" if show_error else None
-                self._load_file(path, error_title=error_title, success_message=success_message)
+                self._load_file(
+                    path,
+                    error_title=error_title,
+                    success_message=success_message,
+                    show_preset_unavailable_warning=show_preset_unavailable_warning,
+                )
                 return
 
     def _load_file(
@@ -1264,20 +1301,27 @@ class SaveEditorApp:
         error_title: Optional[str],
         success_message: Optional[str] = None,
         sync_detected_selection: bool = True,
+        show_preset_unavailable_warning: bool = False,
     ):
         try:
             raw = file_path.read_bytes()
             dec = brotli.decompress(raw)
 
             self.input_anchor_pos = self.find_anchor(dec, INPUT_ANCHOR)
-            self.preset_anchor_pos = self.find_anchor(dec, PRESET_ANCHOR)
+            preset_anchor_pos = dec.find(PRESET_ANCHOR)
+            if preset_anchor_pos >= 0:
+                self.preset_anchor_pos = preset_anchor_pos
+                self._preset_supported = True
+            else:
+                self.preset_anchor_pos = None
+                self._preset_supported = False
 
             for action in ACTIONS:
                 for off in self.get_input_offsets(action):
                     if off >= len(dec):
                         raise ValueError("ファイルの形式が想定と異なります。")
 
-            if self.get_preset_offset() >= len(dec):
+            if self._preset_supported and self.get_preset_offset() >= len(dec):
                 raise ValueError("ファイルの形式が想定と異なります。")
 
             for off in (self.get_helper1_main_offset(), self.get_helper2_main_offset()):
@@ -1302,6 +1346,7 @@ class SaveEditorApp:
                 self._load_values_from_dec(dec)
                 self._refresh_action_combobox_choices()
                 self._refresh_action_helper_combobox_choices()
+                self._update_preset_editability()
             finally:
                 self._suspend_events = False
 
@@ -1311,10 +1356,16 @@ class SaveEditorApp:
             self.base_status_message = success_message or "読み込み完了"
             self.update_save_button_state()
 
+            if not self._preset_supported and show_preset_unavailable_warning:
+                self._show_preset_unavailable_error()
+
         except Exception:
             self.file_path = None
             self.original_dec = None
             self.path_var.set("")
+            self.preset_anchor_pos = None
+            self._preset_supported = True
+            self._update_preset_editability()
             self.base_status_message = "読み込み失敗"
             self.update_save_button_state()
             if error_title:
@@ -1343,12 +1394,15 @@ class SaveEditorApp:
         helper_value_to_label = self._get_helper_value_to_label()
         preset_value_to_label = self._get_current_preset_value_to_label()
 
-        preset_off = self.get_preset_offset()
-        preset_value = dec[preset_off]
-        preset_label = preset_value_to_label.get(preset_value)
-        if preset_label is None:
-            preset_label = "不明"
-            self._ensure_preset_has_value(preset_value, preset_label)
+        if self._preset_supported:
+            preset_off = self.get_preset_offset()
+            preset_value = dec[preset_off]
+            preset_label = preset_value_to_label.get(preset_value)
+            if preset_label is None:
+                preset_label = "不明"
+                self._ensure_preset_has_value(preset_value, preset_label)
+        else:
+            preset_label = self._get_default_preset_label()
         self.preset_var.set(preset_label)
 
         helper1_off = self.get_helper1_main_offset()
@@ -1406,6 +1460,7 @@ class SaveEditorApp:
         try:
             self._load_values_from_dec(self.original_dec)
             self._refresh_action_combobox_choices()
+            self._update_preset_editability()
         finally:
             self._suspend_events = False
 
@@ -1423,11 +1478,12 @@ class SaveEditorApp:
         try:
             dec = bytearray(self.original_dec)
 
-            preset_label_to_value = self._get_current_preset_label_to_value()
-            preset_label = self.preset_var.get()
-            if preset_label not in preset_label_to_value:
-                raise ValueError("確認/キャンセルの値が不正です。")
-            dec[self.get_preset_offset()] = preset_label_to_value[preset_label]
+            if self._preset_supported:
+                preset_label_to_value = self._get_current_preset_label_to_value()
+                preset_label = self.preset_var.get()
+                if preset_label not in preset_label_to_value:
+                    raise ValueError("確認/キャンセルの値が不正です。")
+                dec[self.get_preset_offset()] = preset_label_to_value[preset_label]
 
             helper_label_to_value = self._get_helper_label_to_value()
             action_label_to_value = self._get_current_action_label_to_value()
@@ -1477,6 +1533,7 @@ class SaveEditorApp:
                 self._load_values_from_dec(self.original_dec)
                 self._refresh_action_combobox_choices()
                 self._refresh_action_helper_combobox_choices()
+                self._update_preset_editability()
             finally:
                 self._suspend_events = False
 
