@@ -792,6 +792,25 @@ class SaveEditorApp:
             raise ValueError("入力設定が読み込まれていません。")
         return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
 
+    def _is_standard_action_record(self, dec: bytes, off: int) -> bool:
+        if off + 12 > len(dec):
+            return False
+
+        state_dword = int.from_bytes(dec[off + 4:off + 8], "little")
+        third_dword = int.from_bytes(dec[off + 8:off + 12], "little")
+
+        return (
+            state_dword in (ACTION_STATE_SINGLE, ACTION_STATE_HELPER1, ACTION_STATE_HELPER2)
+            and third_dword == 0
+        )
+
+    def get_writable_input_offsets(self, action: dict, dec: bytes) -> list[int]:
+        writable: list[int] = []
+        for off in self.get_input_offsets(action):
+            if self._is_standard_action_record(dec, off):
+                writable.append(off)
+        return writable
+
     def _action_name_uses_helper_ui(self, action_name: str) -> bool:
         return action_name not in SPECIAL_ACTIONS_WITHOUT_HELPER
 
@@ -1519,7 +1538,7 @@ class SaveEditorApp:
 
                 value = action_label_to_value[selected_label]
 
-                for off in self.get_input_offsets(action):
+                for off in self.get_writable_input_offsets(action, self.original_dec):
                     dec[off:off + 4] = value.to_bytes(4, "little")
                     dec[off + 4:off + 8] = state_dword.to_bytes(4, "little")
 
