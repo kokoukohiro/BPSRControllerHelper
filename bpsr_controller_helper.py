@@ -161,8 +161,8 @@ HELPER_OPTIONS = [
 HELPER_VALUE_TO_LABEL = {value: label for value, label in HELPER_OPTIONS}
 HELPER_LABEL_TO_VALUE = {label: value for value, label in HELPER_OPTIONS}
 
-HELPER1_MAIN_REL_OFFSET = 0x4B7D
-HELPER2_MAIN_REL_OFFSET = 0x4B81
+HELPER1_MAIN_REL_OFFSET = 0x4BE2
+HELPER2_MAIN_REL_OFFSET = 0x4BE6
 
 # 補助キー本体値 -> アクション側の 1byte 値
 HELPER_MAIN_TO_ACTION_VALUE = {
@@ -216,9 +216,9 @@ ACTIONS = [
     {"name": "チャンネル", "rel_offsets": [0x0C7E]},
     {"name": "イラストガイド", "rel_offsets": [0x0CF8]},
     {"name": "クイックホイール", "rel_offsets": [0x0D35]},
-    {"name": "クイックホイール切替（左）", "rel_offsets": [0x2856]},
-    {"name": "クイックホイール切替（右）", "rel_offsets": [0x286B]},
-    {"name": "クイックホイール編集", "rel_offsets": [0x28A8]},
+    {"name": "クイックホイール切替（左）", "rel_offsets": [0x289C]},
+    {"name": "クイックホイール切替（右）", "rel_offsets": [0x28B1]},
+    {"name": "クイックホイール編集", "rel_offsets": [0x28EE]},
     {"name": "クエスト切り替え（左）", "rel_offsets": [0x0FB3]},
     {"name": "クエスト切り替え（右）", "rel_offsets": [0x0FD6]},
     {"name": "ズームアウト", "rel_offsets": [0x058E]},
