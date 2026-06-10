@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 import sys
+import json
 from typing import Optional
 import brotli
 
@@ -39,6 +40,7 @@ ACTION_STATE_HELPER2 = 0x00000001
 
 ACTION_HELPER_NONE_LABEL = "割り当てなし"
 DETECTED_SAVE_MANUAL_LABEL = "設定ファイルを手動選択しました"
+BUTTON_LAYOUT_FILE_NAME = "bpsr_controller_helper_config.json"
 
 CONTROLLER_OPTIONS = ["PlayStation", "Nintendo", "Xbox"]
 DEFAULT_CONTROLLER = "PlayStation"
@@ -161,8 +163,9 @@ HELPER_OPTIONS = [
 HELPER_VALUE_TO_LABEL = {value: label for value, label in HELPER_OPTIONS}
 HELPER_LABEL_TO_VALUE = {label: value for value, label in HELPER_OPTIONS}
 
-HELPER1_MAIN_REL_OFFSET = 0x4BE2
-HELPER2_MAIN_REL_OFFSET = 0x4BE6
+HELPER_PETWHEEL_ANCHOR = b"PetWheel"
+HELPER1_FROM_PETWHEEL_OFFSET = 0x1B
+HELPER2_FROM_PETWHEEL_OFFSET = 0x1F
 
 # 補助キー本体値 -> アクション側の 1byte 値
 HELPER_MAIN_TO_ACTION_VALUE = {
@@ -210,8 +213,8 @@ ACTIONS = [
     {"name": "アイテムを使用", "rel_offsets": [0x090D, 0x186B]},
     {"name": "クイック操作", "rel_offsets": [0x0BA4]},
     {"name": "乗り物召喚/解除", "rel_offsets": [0x0B44]},
-    {"name": "招待承認", "rel_offsets": [0x0BE1, 0x1A89]},
-    {"name": "招待拒否", "rel_offsets": [0x0C1E, 0x1AC6]},
+    {"name": "招待承認", "rel_offsets": [0x0BE1]},
+    {"name": "招待拒否", "rel_offsets": [0x0C1E]},
     {"name": "オートバトル", "rel_offsets": [0x0CBB]},
     {"name": "チャンネル", "rel_offsets": [0x0C7E]},
     {"name": "イラストガイド", "rel_offsets": [0x0CF8]},
@@ -235,6 +238,28 @@ SPECIAL_ACTIONS_WITHOUT_HELPER = {
     "クイックホイール切替（左）",
     "クイックホイール切替（右）",
     "クイックホイール編集",
+}
+
+# =========================
+# 入力レコード種別
+# value の直前4バイトに入っている type
+# =========================
+INPUT_TYPE_KEYBOARD = 0x00000001
+INPUT_TYPE_MOUSE = 0x00000002
+INPUT_TYPE_CONTROLLER = 0x00000003
+
+# =========================
+# lodef / UU1 兼用補正
+# ACTIONS はそのまま維持し、読み込み時に type で実offsetを判定する
+#
+# UU1では一部アクションで controller と keymouse の並びが入れ替わる。
+# ここには「controller候補として見に行く追加offset」だけを置く。
+# 実際に使うかどうかは type=0x00000003 + state構造で判定する。
+# =========================
+ACTION_CONTROLLER_OFFSET_ALIASES = {
+    "環境共鳴能力2": [0x0241],
+    "クエスト切り替え（右）": [0x0FF0],
+    "ホーム設計図": [0x1264],
 }
 
 
@@ -264,6 +289,8 @@ class SaveEditorApp:
 
         self.input_anchor_pos: Optional[int] = None
         self.preset_anchor_pos: Optional[int] = None
+        self.helper1_main_pos: Optional[int] = None
+        self.helper2_main_pos: Optional[int] = None
         self._preset_supported = True
 
         self.combo_vars: dict[str, tk.StringVar] = {}
@@ -291,6 +318,8 @@ class SaveEditorApp:
         self.path_entry: Optional[ttk.Entry] = None
         self.rescan_button: Optional[ttk.Button] = None
         self.manual_select_button: Optional[ttk.Button] = None
+        self.button_layout_save_button: Optional[ttk.Button] = None
+        self.button_layout_load_button: Optional[ttk.Button] = None
 
         self.reset_button: Optional[ttk.Button] = None
         self.save_button: Optional[ttk.Button] = None
@@ -309,6 +338,148 @@ class SaveEditorApp:
         self._bind_clear_selection_click()
         self.rescan_detected_saves()
         self.update_save_button_state()
+
+    def _get_program_dir(self) -> Path:
+        """実行ファイルまたは.pyと同じフォルダを返す。"""
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+        return Path(__file__).resolve().parent
+
+    def get_button_layout_path(self) -> Path:
+        return self._get_program_dir() / BUTTON_LAYOUT_FILE_NAME
+
+    def _append_combo_value_if_missing(self, combo: Optional[ttk.Combobox], label: str):
+        if combo is None or not label:
+            return
+        current_values = list(combo["values"])
+        if label not in current_values:
+            current_values.append(label)
+            combo["values"] = current_values
+
+    def _collect_button_layout(self) -> dict:
+        return {
+            "version": 1,
+            "controller": self.controller_var.get() or DEFAULT_CONTROLLER,
+            "keybind": {
+                "helper1": self.helper1_var.get(),
+                "helper2": self.helper2_var.get(),
+                "preset": self.preset_var.get(),
+            },
+            "actions": {
+                action["name"]: {
+                    "helper": self.action_helper_vars[action["name"]].get(),
+                    "button": self.combo_vars[action["name"]].get(),
+                }
+                for action in ACTIONS
+                if action["name"] in self.combo_vars
+            },
+        }
+
+    def save_button_layout(self):
+        """現在のUI上のボタン配置を、ゲーム設定とは別のJSONに保存する。"""
+        try:
+            path = self.get_button_layout_path()
+            data = self._collect_button_layout()
+            path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            self.base_status_message = f"ボタン配置を保存しました: {path.name}"
+            self.update_save_button_state()
+            messagebox.showinfo("配置保存", f"ボタン配置を保存しました。\n{path}")
+        except Exception as ex:
+            self.base_status_message = "ボタン配置の保存に失敗しました"
+            self.update_save_button_state()
+            messagebox.showerror("配置保存エラー", f"ボタン配置の保存に失敗しました。\n{ex}")
+
+    def load_button_layout(self):
+        """JSONからUI上のボタン配置だけを読み込む。localsave.bytesには書かない。"""
+        path = self.get_button_layout_path()
+        if not path.exists():
+            messagebox.showerror("配置読み込みエラー", f"配置ファイルが見つかりません。\n{path}")
+            return
+
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("配置ファイルの形式が不正です。")
+
+            controller = data.get("controller") or DEFAULT_CONTROLLER
+            if controller not in CONTROLLER_OPTIONS:
+                controller = DEFAULT_CONTROLLER
+
+            keybind = data.get("keybind") or {}
+            actions = data.get("actions") or {}
+            if not isinstance(keybind, dict) or not isinstance(actions, dict):
+                raise ValueError("配置ファイルの形式が不正です。")
+
+            self._suspend_events = True
+            try:
+                self.controller_var.set(controller)
+                self._last_controller_type = controller
+
+                helper_value_to_label = self._get_helper_value_to_label()
+                helper_values = [helper_value_to_label[value] for value, _ in HELPER_OPTIONS]
+                if self.helper1_combobox is not None:
+                    self.helper1_combobox["values"] = list(helper_values)
+                if self.helper2_combobox is not None:
+                    self.helper2_combobox["values"] = list(helper_values)
+
+                preset_values = [label for _, label in self._get_current_preset_options()]
+                if self.preset_combobox is not None:
+                    self.preset_combobox["values"] = list(preset_values)
+
+                helper1 = keybind.get("helper1")
+                helper2 = keybind.get("helper2")
+                preset = keybind.get("preset")
+
+                if helper1 in helper_values:
+                    self.helper1_var.set(helper1)
+                if helper2 in helper_values:
+                    self.helper2_var.set(helper2)
+                if preset in preset_values:
+                    self.preset_var.set(preset)
+
+                self._refresh_action_helper_combobox_choices()
+                self._refresh_action_combobox_choices()
+
+                valid_action_labels = self._get_current_action_label_to_value()
+                valid_helper_labels = set(self._get_action_helper_display_values())
+
+                for action in ACTIONS:
+                    name = action["name"]
+                    saved = actions.get(name)
+                    if not isinstance(saved, dict):
+                        continue
+
+                    helper_label = saved.get("helper")
+                    if (
+                        self._action_name_uses_helper_ui(name)
+                        and helper_label in valid_helper_labels
+                    ):
+                        self.action_helper_vars[name].set(helper_label)
+
+                    button_label = saved.get("button")
+                    if button_label in valid_action_labels:
+                        self._append_combo_value_if_missing(self.comboboxes.get(name), button_label)
+                        self.combo_vars[name].set(button_label)
+
+                self._refresh_action_combobox_choices()
+                self._refresh_action_helper_combobox_choices()
+                self._update_preset_editability()
+            finally:
+                self._suspend_events = False
+
+            self.base_status_message = f"ボタン配置を読み込みました: {path.name}"
+            self.update_save_button_state()
+            messagebox.showinfo(
+                "配置読み込み",
+                "ボタン配置を読み込みました。\nゲーム設定へ反映するには、通常の保存ボタンを押してください。",
+            )
+        except Exception as ex:
+            self.base_status_message = "ボタン配置の読み込みに失敗しました"
+            self.update_save_button_state()
+            messagebox.showerror("配置読み込みエラー", f"ボタン配置の読み込みに失敗しました。\n{ex}")
 
     def _build_ui(self):
         self.root.columnconfigure(0, weight=1)
@@ -361,13 +532,19 @@ class SaveEditorApp:
         controller_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 4: 補助キー + 確認/キャンセル
+        # frame 4: ボタン配置プリセット
+        layout_group = ttk.LabelFrame(self.content, text="ボタン配置プリセット", padding=8)
+        layout_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
+        layout_group.columnconfigure(0, weight=1)
+        row += 1
+
+        # frame 5: 補助キー + 確認/キャンセル
         keybind_group = ttk.LabelFrame(self.content, text="ボタン配置", padding=8)
         keybind_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         keybind_group.columnconfigure(0, weight=1)
         row += 1
 
-        # frame 5: アクション一覧
+        # frame 6: アクション一覧
         action_group = ttk.LabelFrame(self.content, text="ボタン配置", padding=8)
         action_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
         action_group.columnconfigure(0, weight=1)
@@ -426,6 +603,31 @@ class SaveEditorApp:
         )
         self.controller_combobox.grid(row=0, column=0, sticky="ew")
         self._register_combobox_bindings(self.controller_combobox)
+
+        layout_row = ttk.Frame(layout_group)
+        layout_row.grid(row=0, column=0, sticky="ew")
+        layout_row.columnconfigure(0, weight=1)
+        layout_row.columnconfigure(1, weight=1)
+
+        self.button_layout_save_button = ttk.Button(
+            layout_row,
+            text="配置保存",
+            command=self.save_button_layout,
+        )
+        self.button_layout_save_button.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+
+        self.button_layout_load_button = ttk.Button(
+            layout_row,
+            text="配置読み込み",
+            command=self.load_button_layout,
+        )
+        self.button_layout_load_button.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+
+        ttk.Label(
+            layout_group,
+            text=f"保存先: {BUTTON_LAYOUT_FILE_NAME}",
+            justify="left",
+        ).grid(row=1, column=0, sticky="w", pady=(6, 0))
 
         sub_row = 0
 
@@ -787,26 +989,66 @@ class SaveEditorApp:
             raise ValueError("必須データが見つかりません。")
         return pos
 
-    def get_input_offsets(self, action: dict) -> list[int]:
+    def get_input_offsets(self, action: dict, dec: Optional[bytes] = None) -> list[int]:
+        """
+        BKRInputConfigData 基準のアクションvalue位置を返す。
+
+        通常は ACTIONS の rel_offsets をそのまま使う。
+        ただし UU1 では一部だけ controller/keymouse の並びが入れ替わるため、
+        ACTIONS は変更せず、追加候補を type 判定して controller 実位置を解決する。
+        """
         if self.input_anchor_pos is None:
             raise ValueError("入力設定が読み込まれていません。")
+
+        rel_candidates = list(action["rel_offsets"])
+        for rel in ACTION_CONTROLLER_OFFSET_ALIASES.get(action["name"], []):
+            if rel not in rel_candidates:
+                rel_candidates.append(rel)
+
+        abs_candidates = [self.input_anchor_pos + rel for rel in rel_candidates]
+
+        if dec is None:
+            return abs_candidates
+
+        resolved = [
+            off for off in abs_candidates
+            if self._is_standard_action_record(dec, off)
+        ]
+
+        # 対応版でない/未知構造の場合は、従来offsetを返して従来動作に戻す
+        if resolved:
+            return resolved
+
         return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
 
     def _is_standard_action_record(self, dec: bytes, off: int) -> bool:
-        if off + 12 > len(dec):
+        """
+        controller側の標準アクションレコードか判定する。
+
+        構造:
+          off - 0x04 = type
+          off + 0x00 = value
+          off + 0x04 = state
+          off + 0x08 = third dword
+
+        キーマウ側は off - 0x04 が 0x01/0x02 なので除外する。
+        """
+        if off < 4 or off + 12 > len(dec):
             return False
 
+        input_type = int.from_bytes(dec[off - 4:off], "little")
         state_dword = int.from_bytes(dec[off + 4:off + 8], "little")
         third_dword = int.from_bytes(dec[off + 8:off + 12], "little")
 
         return (
-            state_dword in (ACTION_STATE_SINGLE, ACTION_STATE_HELPER1, ACTION_STATE_HELPER2)
+            input_type == INPUT_TYPE_CONTROLLER
+            and state_dword in (ACTION_STATE_SINGLE, ACTION_STATE_HELPER1, ACTION_STATE_HELPER2)
             and third_dword == 0
         )
 
     def get_writable_input_offsets(self, action: dict, dec: bytes) -> list[int]:
         writable: list[int] = []
-        for off in self.get_input_offsets(action):
+        for off in self.get_input_offsets(action, dec):
             if self._is_standard_action_record(dec, off):
                 writable.append(off)
         return writable
@@ -834,15 +1076,39 @@ class SaveEditorApp:
             raise ValueError("確認/キャンセル設定が読み込まれていません。")
         return self.preset_anchor_pos + PRESET_REL_OFFSET
 
+    def _is_valid_helper_main_value(self, value: int) -> bool:
+        return value in HELPER_VALUE_TO_LABEL
+
+    def find_helper_main_offsets(self, dec: bytes) -> tuple[int, int]:
+        petwheel_pos = dec.find(HELPER_PETWHEEL_ANCHOR)
+        if petwheel_pos < 0:
+            raise ValueError("補助キー設定が見つかりません。")
+
+        helper1_off = petwheel_pos + HELPER1_FROM_PETWHEEL_OFFSET
+        helper2_off = petwheel_pos + HELPER2_FROM_PETWHEEL_OFFSET
+
+        if helper2_off + 4 > len(dec):
+            raise ValueError("補助キー設定が見つかりません。")
+
+        helper1_value = int.from_bytes(dec[helper1_off:helper1_off + 4], "little")
+        helper2_value = int.from_bytes(dec[helper2_off:helper2_off + 4], "little")
+
+        if not self._is_valid_helper_main_value(helper1_value):
+            raise ValueError("補助キー1の保存位置を特定できません。")
+        if not self._is_valid_helper_main_value(helper2_value):
+            raise ValueError("補助キー2の保存位置を特定できません。")
+
+        return helper1_off, helper2_off
+
     def get_helper1_main_offset(self) -> int:
-        if self.input_anchor_pos is None:
-            raise ValueError("補助キー設定が読み込まれていません。")
-        return self.input_anchor_pos + HELPER1_MAIN_REL_OFFSET
+        if self.helper1_main_pos is None:
+            raise ValueError("補助キー1の保存位置を特定できません。")
+        return self.helper1_main_pos
 
     def get_helper2_main_offset(self) -> int:
-        if self.input_anchor_pos is None:
-            raise ValueError("補助キー設定が読み込まれていません。")
-        return self.input_anchor_pos + HELPER2_MAIN_REL_OFFSET
+        if self.helper2_main_pos is None:
+            raise ValueError("補助キー2の保存位置を特定できません。")
+        return self.helper2_main_pos
 
     def _ensure_combo_has_value(self, action_name: str, value: int, label: str):
         combo = self.comboboxes[action_name]
@@ -1327,6 +1593,7 @@ class SaveEditorApp:
             dec = brotli.decompress(raw)
 
             self.input_anchor_pos = self.find_anchor(dec, INPUT_ANCHOR)
+            self.helper1_main_pos, self.helper2_main_pos = self.find_helper_main_offsets(dec)
             preset_anchor_pos = dec.find(PRESET_ANCHOR)
             if preset_anchor_pos >= 0:
                 self.preset_anchor_pos = preset_anchor_pos
@@ -1383,6 +1650,8 @@ class SaveEditorApp:
             self.original_dec = None
             self.path_var.set("")
             self.preset_anchor_pos = None
+            self.helper1_main_pos = None
+            self.helper2_main_pos = None
             self._preset_supported = True
             self._update_preset_editability()
             self.base_status_message = "読み込み失敗"
@@ -1444,7 +1713,7 @@ class SaveEditorApp:
 
         for action in ACTIONS:
             name = action["name"]
-            offsets = self.get_input_offsets(action)
+            offsets = self.get_input_offsets(action, dec)
             first_off = offsets[0]
             first_value = int.from_bytes(dec[first_off:first_off + 4], "little")
             state_dword = int.from_bytes(dec[first_off + 4:first_off + 8], "little")

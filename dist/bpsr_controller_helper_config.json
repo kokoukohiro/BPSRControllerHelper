@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "controller": "PlayStation",
+  "keybind": {
+    "helper1": "L1",
+    "helper2": "R1",
+    "preset": "〇 / ×"
+  },
+  "actions": {
+    "ジャンプ": {
+      "helper": "割り当てなし",
+      "button": "△"
+    },
+    "ダッシュ/回避": {
+      "helper": "割り当てなし",
+      "button": "×"
+    },
+    "環境共鳴能力1": {
+      "helper": "L1",
+      "button": "△"
+    },
+    "環境共鳴能力2": {
+      "helper": "L1",
+      "button": "×"
+    },
+    "通常攻撃": {
+      "helper": "割り当てなし",
+      "button": "R2"
+    },
+    "特殊攻撃": {
+      "helper": "割り当てなし",
+      "button": "L2"
+    },
+    "マスタリースキル1": {
+      "helper": "R1",
+      "button": "□"
+    },
+    "マスタリースキル2": {
+      "helper": "R1",
+      "button": "△"
+    },
+    "マスタリースキル3": {
+      "helper": "R1",
+      "button": "〇"
+    },
+    "マスタリースキル4": {
+      "helper": "R1",
+      "button": "×"
+    },
+    "究極スキル": {
+      "helper": "割り当てなし",
+      "button": "L3"
+    },
+    "バトルイマジン1": {
+      "helper": "L1",
+      "button": "□"
+    },
+    "バトルイマジン2": {
+      "helper": "L1",
+      "button": "〇"
+    },
+    "左でアイテム切り替え": {
+      "helper": "L1",
+      "button": "←"
+    },
+    "アイテム使用": {
+      "helper": "L1",
+      "button": "↑"
+    },
+    "右でアイテム切り替え": {
+      "helper": "L1",
+      "button": "→"
+    },
+    "アクション": {
+      "helper": "割り当てなし",
+      "button": "〇"
+    },
+    "ロックオン/切り替え": {
+      "helper": "割り当てなし",
+      "button": "R3"
+    },
+    "エクストラスキル": {
+      "helper": "割り当てなし",
+      "button": "□"
+    },
+    "インタラクト解除": {
+      "helper": "割り当てなし",
+      "button": "□"
+    },
+    "クエスト追跡": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "UI非表示": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "クエストアイテムのクイック使用": {
+      "helper": "割り当てなし",
+      "button": "share"
+    },
+    "マップON/OFF": {
+      "helper": "割り当てなし",
+      "button": "touchpad"
+    },
+    "クエスト": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "ソーシャルモード": {
+      "helper": "割り当てなし",
+      "button": "touchpad"
+    },
+    "メニューを開く": {
+      "helper": "割り当てなし",
+      "button": "option"
+    },
+    "撮影": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "ダンジョン退出": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "アイテムを使用": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "クイック操作": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "乗り物召喚/解除": {
+      "helper": "R1",
+      "button": "L3"
+    },
+    "招待承認": {
+      "helper": "L1",
+      "button": "R3"
+    },
+    "招待拒否": {
+      "helper": "L1",
+      "button": "L3"
+    },
+    "オートバトル": {
+      "helper": "R1",
+      "button": "R3"
+    },
+    "チャンネル": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "イラストガイド": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "クイックホイール": {
+      "helper": "割り当てなし",
+      "button": "share"
+    },
+    "クイックホイール切替（左）": {
+      "helper": "割り当てなし",
+      "button": "L1"
+    },
+    "クイックホイール切替（右）": {
+      "helper": "割り当てなし",
+      "button": "R1"
+    },
+    "クイックホイール編集": {
+      "helper": "割り当てなし",
+      "button": "L2"
+    },
+    "クエスト切り替え（左）": {
+      "helper": "R1",
+      "button": "L2"
+    },
+    "クエスト切り替え（右）": {
+      "helper": "R1",
+      "button": "R2"
+    },
+    "ズームアウト": {
+      "helper": "L1",
+      "button": "R2"
+    },
+    "ズームイン": {
+      "helper": "L1",
+      "button": "L2"
+    },
+    "スキルパレットを開く": {
+      "helper": "L1",
+      "button": "L方向入力"
+    },
+    "ロールスキル1": {
+      "helper": "割り当てなし",
+      "button": "↑"
+    },
+    "ロールスキル2": {
+      "helper": "割り当てなし",
+      "button": "→"
+    },
+    "ロールスキル3": {
+      "helper": "割り当てなし",
+      "button": "↓"
+    },
+    "ロールスキル4": {
+      "helper": "割り当てなし",
+      "button": "←"
+    },
+    "ホーム設計図": {
+      "helper": "L1",
+      "button": "L方向入力"
+    }
+  }
+}
