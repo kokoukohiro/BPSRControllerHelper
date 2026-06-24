@@ -841,6 +841,7 @@ class SaveEditorApp:
         self._bind_traces()
         self._bind_mousewheel()
         self._bind_clear_selection_click()
+        self._restore_mode_independent_settings_from_startup_json()
         self._update_mode_linking()
         self._update_input_mode_ui()
         self.rescan_detected_saves()
@@ -854,6 +855,44 @@ class SaveEditorApp:
 
     def get_button_layout_path(self) -> Path:
         return self._get_program_dir() / BUTTON_LAYOUT_FILE_NAME
+
+    def _restore_mode_independent_settings_from_startup_json(self):
+        """起動時に保存済みJSONからモード単独設定のチェック状態だけを復元する。"""
+        path = self.get_button_layout_path()
+        if not path.exists():
+            return
+
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+            return
+
+        if not isinstance(data, dict):
+            return
+
+        controller_profile = data.get("controller_profile")
+        keymouse_profile = data.get("keymouse_profile")
+
+        previous_suspend = self._suspend_events
+        self._suspend_events = True
+        try:
+            if isinstance(controller_profile, dict):
+                self.controller_photo_mode_independent_var.set(
+                    controller_profile.get("photo_mode_independent") is True
+                )
+                self.controller_fishing_mode_independent_var.set(
+                    controller_profile.get("fishing_mode_independent") is True
+                )
+
+            if isinstance(keymouse_profile, dict):
+                self.keymouse_photo_mode_independent_var.set(
+                    keymouse_profile.get("photo_mode_independent") is True
+                )
+                self.keymouse_fishing_mode_independent_var.set(
+                    keymouse_profile.get("fishing_mode_independent") is True
+                )
+        finally:
+            self._suspend_events = previous_suspend
 
     def _append_combo_value_if_missing(self, combo: Optional[ttk.Combobox], label: str):
         if combo is None or not label:
