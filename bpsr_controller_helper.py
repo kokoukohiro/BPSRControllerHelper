@@ -57,7 +57,7 @@ DETECTED_SAVE_MANUAL_LABEL = "設定ファイルを手動選択しました"
 BUTTON_LAYOUT_FILE_NAME = "bpsr_controller_helper_config.json"
 
 CONTROLLER_OPTIONS = ["PlayStation", "Nintendo", "Xbox"]
-KEYMOUSE_DEVICE = "キーボード・マウス"
+KEYMOUSE_DEVICE = "キーボード/マウス"
 INPUT_DEVICE_OPTIONS = [*CONTROLLER_OPTIONS]
 SAVED_INPUT_DEVICE_OPTIONS = [*CONTROLLER_OPTIONS, KEYMOUSE_DEVICE]
 DEFAULT_CONTROLLER = "PlayStation"
@@ -313,7 +313,7 @@ INPUT_TYPE_MOUSE = 0x00000002
 INPUT_TYPE_CONTROLLER = 0x00000003
 
 # =========================
-# キーボード・マウス用のキー一覧
+# キーボード/マウス用のキー一覧
 # Excel「キー一覧」シートのキーボード / マウスをすべて収録
 # =========================
 KEYMOUSE_OPTIONS = [
@@ -419,7 +419,7 @@ KEYMOUSE_LABEL_TO_RECORD = {
 }
 KEYMOUSE_COMBO_VALUES = [label for _, _, label in KEYMOUSE_OPTIONS]
 
-# これらのキーボード・マウス操作は、ゲーム内では L Ctrl との同時入力として使う。
+# これらのキーボード/マウス操作は、ゲーム内では L Ctrl との同時入力として使う。
 KEYMOUSE_LCTRL_PREFIX_ACTION_NAMES = {
     "UI非表示",
     "パーティボイス切り替え",
@@ -430,7 +430,7 @@ KEYMOUSE_LCTRL_PREFIX_ACTION_NAMES = {
 }
 
 # =========================
-# キーボード・マウスの既知アクション一覧
+# キーボード/マウスの既知アクション一覧
 # Excel「アクション一覧」の不明アクション以外をすべて収録
 # =========================
 KEYMOUSE_ACTIONS = [
@@ -770,7 +770,7 @@ class SaveEditorApp:
         self.action_helper_combos: dict[str, ttk.Combobox] = {}
         self.controller_action_control_widgets: dict[str, list[ttk.Combobox]] = {}
 
-        # キーボード・マウス用のUI状態
+        # キーボード/マウス用のUI状態
         self.keymouse_combo_vars: dict[str, tk.StringVar] = {}
         self.keymouse_comboboxes: dict[str, ttk.Combobox] = {}
         self.keymouse_action_control_widgets: dict[str, list[ttk.Combobox]] = {}
@@ -1007,7 +1007,7 @@ class SaveEditorApp:
     def _apply_keymouse_layout_profile(self, profile: dict):
         actions = profile.get("actions") or {}
         if not isinstance(actions, dict):
-            raise ValueError("キーボード・マウス配置の形式が不正です。")
+            raise ValueError("キーボード/マウス配置の形式が不正です。")
 
         for action in KEYMOUSE_ACTIONS:
             name = action["name"]
@@ -1337,7 +1337,7 @@ class SaveEditorApp:
 
         self.keymouse_mode_button = ttk.Button(
             input_mode_button_row,
-            text="キーボード・マウス",
+            text="キーボード/マウス",
             command=self._activate_keymouse_mode,
         )
         self.keymouse_mode_button.grid(
@@ -1790,7 +1790,7 @@ class SaveEditorApp:
         action: dict,
         display_name: Optional[str] = None,
     ):
-        """キーボード・マウス用のアクション行を追加する。補助キーUIは持たない。"""
+        """キーボード/マウス用のアクション行を追加する。補助キーUIは持たない。"""
         frame = ttk.Frame(parent)
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 4))
         frame.columnconfigure(0, weight=1)
@@ -2157,7 +2157,7 @@ class SaveEditorApp:
         """
         ゲームパッド側のBKRInputConfigData相対value位置を返す。
 
-        UU1では一部だけキーボード・マウスと並びが入れ替わるため、
+        UU1では一部だけキーボード/マウスと並びが入れ替わるため、
         lodef位置とUU1候補のどちらが controller record かをtypeで判定する。
         """
         if self.input_anchor_pos is None:
@@ -2184,7 +2184,7 @@ class SaveEditorApp:
 
     def get_keymouse_input_offsets(self, action: dict, dec: Optional[bytes] = None) -> list[int]:
         """
-        キーボード・マウス側のBKRInputConfigData相対value位置を返す。
+        キーボード/マウス側のBKRInputConfigData相対value位置を返す。
 
         type=0x01/0x02のレコードだけを採用するため、UU1の入れ替わり位置も
         lodef / UU1のどちらかへ自動追従する。
