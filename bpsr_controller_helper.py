@@ -272,6 +272,7 @@ ACTIONS = [
     {'name': '撮影モード設定メニュー', 'rel_offsets': [0x02688]},
     {'name': '撮影モード参加者メニュー', 'rel_offsets': [0x026C5]},
     {'name': '撮影モードカーソル呼出し', 'rel_offsets': [0x027B8]},
+    {'name': '撮影モードメニューを閉じる', 'rel_offsets': [0x0226F]},
     {'name': '撮影モード移動-前後', 'rel_offsets': [0x02430], 'allowed_values': [0x00000001]},
     {'name': '撮影モード移動-左右', 'rel_offsets': [0x02445], 'allowed_values': [0x00000002]},
     {'name': '撮影モードカメラ-前後', 'rel_offsets': [0x0273A], 'allowed_values': [0x00000003]},
@@ -285,7 +286,6 @@ ACTIONS = [
     {'name': '撮影モードマスタリースキル4', 'rel_offsets': [0x025A5]},
     {'name': '撮影モード究極スキル', 'rel_offsets': [0x0209A]},
     {'name': '撮影モード乗り物召喚/解除', 'rel_offsets': [0x025E2]},
-    {'name': '撮影モードメニューを閉じる', 'rel_offsets': [0x0226F]},
     {'name': '撮影モードカーソル移動-上下', 'rel_offsets': [0x027FE]},
     {'name': '撮影モードカーソル移動-左右', 'rel_offsets': [0x02821]},
     {'name': '撮影モードズームアウト', 'rel_offsets': [0x020EC]},
@@ -599,6 +599,16 @@ MODE_PREFIXES = (PHOTO_MODE_PREFIX, FISHING_MODE_PREFIX)
 PHOTO_MODE_UNLINKED_ACTION_NAMES = {
     "撮影モード撮影",
 }
+
+# ゲームパッド側だけ、通常の「メニューを閉じる」と連動させない。
+CONTROLLER_PHOTO_MODE_UNLINKED_ACTION_NAMES = (
+    PHOTO_MODE_UNLINKED_ACTION_NAMES
+    | {"撮影モードメニューを閉じる"}
+)
+CONTROLLER_FISHING_MODE_UNLINKED_ACTION_NAMES = {
+    "釣りモードメニューを閉じる",
+}
+
 FISHING_MODE_UNLINKED_ACTION_NAMES: set[str] = set()
 
 
@@ -706,7 +716,7 @@ CONTROLLER_PHOTO_MODE_LINKS = _build_mode_links(
     PHOTO_MODE_PREFIX,
     {
     },
-    PHOTO_MODE_UNLINKED_ACTION_NAMES,
+    CONTROLLER_PHOTO_MODE_UNLINKED_ACTION_NAMES,
 )
 
 KEYMOUSE_PHOTO_MODE_LINKS = _build_mode_links(
@@ -729,7 +739,7 @@ CONTROLLER_FISHING_MODE_LINKS = _build_mode_links(
     ACTIONS,
     FISHING_MODE_PREFIX,
     {},
-    FISHING_MODE_UNLINKED_ACTION_NAMES,
+    CONTROLLER_FISHING_MODE_UNLINKED_ACTION_NAMES,
 )
 KEYMOUSE_FISHING_MODE_LINKS = _build_mode_links(
     KEYMOUSE_ACTIONS,
@@ -804,7 +814,6 @@ class SaveEditorApp:
         self.keymouse_mode_var = tk.BooleanVar(value=False)
         self.controller_photo_mode_independent_var = tk.BooleanVar(value=False)
         self.keymouse_photo_mode_independent_var = tk.BooleanVar(value=False)
-        self.controller_fishing_mode_independent_var = tk.BooleanVar(value=False)
         self.keymouse_fishing_mode_independent_var = tk.BooleanVar(value=False)
 
         self.preset_combobox: Optional[ttk.Combobox] = None
@@ -820,7 +829,6 @@ class SaveEditorApp:
         self.button_layout_load_button: Optional[ttk.Button] = None
         self.controller_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
-        self.controller_fishing_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_fishing_mode_checkbutton: Optional[ttk.Checkbutton] = None
 
         self.keybind_group: Optional[ttk.LabelFrame] = None
@@ -885,9 +893,6 @@ class SaveEditorApp:
                 self.controller_photo_mode_independent_var.set(
                     controller_profile.get("photo_mode_independent") is True
                 )
-                self.controller_fishing_mode_independent_var.set(
-                    controller_profile.get("fishing_mode_independent") is True
-                )
 
             if isinstance(keymouse_profile, dict):
                 self.keymouse_photo_mode_independent_var.set(
@@ -925,9 +930,6 @@ class SaveEditorApp:
             "controller_type": self._get_current_controller_type(),
             "photo_mode_independent": bool(
                 self.controller_photo_mode_independent_var.get()
-            ),
-            "fishing_mode_independent": bool(
-                self.controller_fishing_mode_independent_var.get()
             ),
             "keybind": {
                 "helper1": self.helper1_var.get(),
@@ -1032,9 +1034,6 @@ class SaveEditorApp:
 
         self.controller_photo_mode_independent_var.set(
             bool(profile.get("photo_mode_independent", False))
-        )
-        self.controller_fishing_mode_independent_var.set(
-            bool(profile.get("fishing_mode_independent", False))
         )
         self._refresh_action_combobox_choices()
         self._refresh_action_helper_combobox_choices()
@@ -1517,21 +1516,8 @@ class SaveEditorApp:
             )
 
         # 釣りモードのアクション一覧
-        self.controller_fishing_mode_checkbutton = ttk.Checkbutton(
-            self.controller_fishing_action_group,
-            text="釣りモードのアクションを単独で設定する",
-            variable=self.controller_fishing_mode_independent_var,
-        )
-        self.controller_fishing_mode_checkbutton.grid(
-            row=0,
-            column=0,
-            sticky="w",
-            pady=(0, 8),
-        )
-
         for action_row, action in enumerate(
             CONTROLLER_FISHING_MODE_ACTIONS,
-            start=1,
         ):
             self._add_action_row(
                 self.controller_fishing_action_group,
@@ -1863,10 +1849,6 @@ class SaveEditorApp:
             "write",
             self._on_any_value_changed,
         )
-        self.controller_fishing_mode_independent_var.trace_add(
-            "write",
-            self._on_any_value_changed,
-        )
         self.keymouse_fishing_mode_independent_var.trace_add(
             "write",
             self._on_any_value_changed,
@@ -2168,7 +2150,7 @@ class SaveEditorApp:
         self._sync_controller_mode_linking(
             CONTROLLER_FISHING_MODE_ACTIONS,
             CONTROLLER_FISHING_MODE_LINKS,
-            bool(self.controller_fishing_mode_independent_var.get()),
+            True,
         )
         self._sync_keymouse_mode_linking(
             KEYMOUSE_FISHING_MODE_ACTIONS,

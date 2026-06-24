@@ -3,8 +3,7 @@
   "input_device": "PlayStation",
   "controller_profile": {
     "controller_type": "PlayStation",
-    "photo_mode_independent": true,
-    "fishing_mode_independent": false,
+    "photo_mode_independent": false,
     "keybind": {
       "helper1": "L1",
       "helper2": "R1",
