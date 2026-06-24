@@ -817,7 +817,6 @@ class SaveEditorApp:
         self.path_entry: Optional[ttk.Entry] = None
         self.rescan_button: Optional[ttk.Button] = None
         self.manual_select_button: Optional[ttk.Button] = None
-        self.button_layout_save_button: Optional[ttk.Button] = None
         self.button_layout_load_button: Optional[ttk.Button] = None
         self.controller_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
@@ -970,22 +969,15 @@ class SaveEditorApp:
             "keymouse_profile": self._collect_keymouse_layout_profile(),
         }
 
-    def save_button_layout(self):
-        """現在のUI上の配置を、ゲーム設定とは別のJSONに保存する。"""
-        try:
-            path = self.get_button_layout_path()
-            data = self._collect_button_layout()
-            path.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            self.base_status_message = f"キー設定を保存しました: {path.name}"
-            self.update_save_button_state()
-            messagebox.showinfo("配置保存", f"キー設定を保存しました。\n{path}")
-        except Exception as ex:
-            self.base_status_message = "キー設定の保存に失敗しました"
-            self.update_save_button_state()
-            messagebox.showerror("配置保存エラー", f"キー設定の保存に失敗しました。\n{ex}")
+    def _write_button_layout_file(self) -> Path:
+        """現在のUI上のキー設定をJSONへ保存し、保存先を返す。"""
+        path = self.get_button_layout_path()
+        data = self._collect_button_layout()
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        return path
 
     def _apply_controller_layout_profile(self, profile: dict, controller_type: str):
         if controller_type not in CONTROLLER_OPTIONS:
@@ -1410,37 +1402,23 @@ class SaveEditorApp:
         layout_row = ttk.Frame(layout_group)
         layout_row.grid(row=0, column=0, sticky="ew")
         layout_row.columnconfigure(0, weight=1)
-        layout_row.columnconfigure(1, weight=1)
 
-        self.button_layout_save_button = ttk.Button(
+        ttk.Label(
             layout_row,
-            text="配置保存",
-            command=self.save_button_layout,
-        )
-        self.button_layout_save_button.grid(
-            row=0,
-            column=0,
-            sticky="ew",
-            padx=(0, 4),
-        )
+            text=f"保存先: {BUTTON_LAYOUT_FILE_NAME}",
+            justify="left",
+        ).grid(row=0, column=0, sticky="w")
 
         self.button_layout_load_button = ttk.Button(
             layout_row,
-            text="配置読み込み",
+            text="読み込み",
             command=self.load_button_layout,
         )
         self.button_layout_load_button.grid(
             row=0,
             column=1,
-            sticky="ew",
-            padx=(4, 0),
+            sticky="e",
         )
-
-        ttk.Label(
-            layout_group,
-            text=f"保存先: {BUTTON_LAYOUT_FILE_NAME}",
-            justify="left",
-        ).grid(row=1, column=0, sticky="w", pady=(6, 0))
 
         # ゲームパッドの補助キー・確認/キャンセル
         helper_values = [
@@ -3189,9 +3167,14 @@ class SaveEditorApp:
             else:
                 self._save_controller_file()
 
+            preset_path = self._write_button_layout_file()
+
             self.base_status_message = "保存しました"
             self.update_save_button_state()
-            messagebox.showinfo("保存完了", "保存しました。")
+            messagebox.showinfo(
+                "保存完了",
+                f"保存しました。\nキー設定プリセットを作成しました。\n{preset_path}",
+            )
 
         except Exception:
             self.base_status_message = "保存失敗"
