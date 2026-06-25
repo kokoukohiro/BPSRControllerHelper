@@ -1,8 +1,9 @@
 {
-  "version": 4,
-  "input_device": "PlayStation",
+  "version": 5,
+  "input_device": "キーボード/マウス",
   "controller_profile": {
     "controller_type": "PlayStation",
+    "quick_wheel_independent": false,
     "photo_mode_independent": false,
     "keybind": {
       "helper1": "L1",
@@ -202,6 +203,10 @@
         "helper": "割り当てなし",
         "button": "L2"
       },
+      "クイックホイールを閉じる": {
+        "helper": "割り当てなし",
+        "button": "share"
+      },
       "クエスト切り替え（左）": {
         "helper": "R1",
         "button": "L2"
@@ -278,6 +283,10 @@
         "helper": "割り当てなし",
         "button": "L3"
       },
+      "撮影モードメニューを閉じる": {
+        "helper": "L1",
+        "button": "L前後入力"
+      },
       "撮影モード移動-前後": {
         "helper": "割り当てなし",
         "button": "L前後入力"
@@ -329,10 +338,6 @@
       "撮影モード乗り物召喚/解除": {
         "helper": "R1",
         "button": "L3"
-      },
-      "撮影モードメニューを閉じる": {
-        "helper": "L1",
-        "button": "L前後入力"
       },
       "撮影モードカーソル移動-上下": {
         "helper": "割り当てなし",
@@ -393,6 +398,7 @@
     }
   },
   "keymouse_profile": {
+    "quick_wheel_independent": false,
     "photo_mode_independent": false,
     "fishing_mode_independent": false,
     "actions": {
@@ -421,7 +427,7 @@
         "key": "マウス右クリック"
       },
       "環境共鳴能力1": {
-        "key": "Q"
+        "key": "L"
       },
       "環境共鳴能力2": {
         "key": "E"
@@ -493,10 +499,10 @@
         "key": "M"
       },
       "クエスト": {
-        "key": "L"
+        "key": "Q"
       },
       "ソーシャルモード": {
-        "key": "J"
+        "key": "T"
       },
       "トーク": {
         "key": "Enter"
@@ -532,16 +538,16 @@
         "key": "/"
       },
       "所持品": {
-        "key": "B"
-      },
-      "パーティ": {
         "key": "I"
       },
+      "パーティ": {
+        "key": "P"
+      },
       "シーズンセンター": {
-        "key": "O"
+        "key": "]"
       },
       "ダンジョン退出": {
-        "key": "P"
+        "key": "B"
       },
       "アビリティ": {
         "key": "N"
@@ -568,19 +574,22 @@
         "key": "H"
       },
       "チャンネル": {
-        "key": "P"
+        "key": "O"
       },
       "イラストガイド": {
         "key": "6"
       },
       "クイックホイール": {
-        "key": "T"
+        "key": "J"
       },
       "クイックホイール切替": {
         "key": "マウススクロール"
       },
       "クイックホイール編集": {
         "key": "Q"
+      },
+      "クイックホイールを閉じる": {
+        "key": "J"
       },
       "オートラン": {
         "key": "^"
@@ -776,6 +785,21 @@
       },
       "釣りモードメニューを閉じる": {
         "key": "Esc"
+      },
+      "釣りモードトーク": {
+        "key": "Enter"
+      },
+      "釣りモードチャット画面チャンネル切り替え-下": {
+        "key": "↓"
+      },
+      "釣りモードチャット画面チャンネル切り替え-上": {
+        "key": "↑"
+      },
+      "釣りモードチャット入力チャンネル切り替え-左": {
+        "key": "←"
+      },
+      "釣りモードチャット入力チャンネル切り替え-右": {
+        "key": "→"
       }
     }
   }

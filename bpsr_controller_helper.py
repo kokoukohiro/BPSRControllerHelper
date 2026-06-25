@@ -3,6 +3,8 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 import sys
 import json
+import copy
+import subprocess
 from typing import Optional
 import brotli
 
@@ -32,21 +34,10 @@ KEY_OPTIONS = [
     (25, "←"),
     (26, "→"),
 ]
-VALUE_TO_LABEL = {value: label for value, label in KEY_OPTIONS}
-LABEL_TO_VALUE = {label: value for value, label in KEY_OPTIONS}
-
-CONTROLLER_AXIS_VALUES = {1, 2, 3, 4}
-
 # 方向入力以外のアクションにも、L/Rスティックの各方向入力を割り当て可能にする。
-# 方向入力アクション自身は、後段の CONTROLLER_DIRECTION_ACTION_NAMES で
+# 方向入力アクション自身は、後段の CONTROLLER_DIRECTION_ACTION_IDS で
 # L前後 / L左右 / R前後 / R左右の4択に限定する。
-CONTROLLER_ASSIGNABLE_VALUES = [
-    value for value, _ in KEY_OPTIONS
-]
-BASE_ACTION_COMBO_VALUES = [
-    VALUE_TO_LABEL[value]
-    for value in CONTROLLER_ASSIGNABLE_VALUES
-]
+CONTROLLER_ASSIGNABLE_VALUES = [value for value, _ in KEY_OPTIONS]
 
 ACTION_STATE_SINGLE = 0xFFFFFFFF
 ACTION_STATE_HELPER1 = 0x00000000
@@ -59,7 +50,6 @@ BUTTON_LAYOUT_FILE_NAME = "bpsr_controller_helper_config.json"
 CONTROLLER_OPTIONS = ["PlayStation", "Nintendo", "Xbox"]
 KEYMOUSE_DEVICE = "キーボード/マウス"
 INPUT_DEVICE_OPTIONS = [*CONTROLLER_OPTIONS]
-SAVED_INPUT_DEVICE_OPTIONS = [*CONTROLLER_OPTIONS, KEYMOUSE_DEVICE]
 DEFAULT_CONTROLLER = "PlayStation"
 
 CONTROLLER_DISPLAY_MAPS = {
@@ -136,7 +126,6 @@ CONTROLLER_DISPLAY_MAPS = {
 
 
 # =========================
-# アンカー# =========================
 # アンカー
 # =========================
 INPUT_ANCHOR = b"BKRInputConfigData"
@@ -184,8 +173,7 @@ HELPER_OPTIONS = [
     (0x04, "L2"),
     (0x08, "R2"),
 ]
-HELPER_VALUE_TO_LABEL = {value: label for value, label in HELPER_OPTIONS}
-HELPER_LABEL_TO_VALUE = {label: value for value, label in HELPER_OPTIONS}
+HELPER_MAIN_VALUES = {value for value, _ in HELPER_OPTIONS}
 
 HELPER_PETWHEEL_ANCHOR = b"PetWheel"
 HELPER1_FROM_PETWHEEL_OFFSET = 0x1B
@@ -201,112 +189,155 @@ HELPER_MAIN_TO_ACTION_VALUE = {
 
 
 # =========================
-# ゲームパッドの既知アクション一覧
-# 既存の並びを維持しつつ、Excelで確定した不明以外のアクションを追加
+# アクション定義
+# 通常 / クイックホイール / 撮影モード / 釣りモードを定義段階で分離する。
+# 各アクションの name は、そのグループ内だけで使うローカル表示名。
+# id は group と name を組み合わせた内部キーで、UI状態・プロフィール・連動に使う。
 # =========================
-ACTIONS = [
-    {'name': '移動-前後', 'rel_offsets': [0x000B2], 'allowed_values': [0x00000001]},
-    {'name': '移動-左右', 'rel_offsets': [0x000C7], 'allowed_values': [0x00000002]},
-    {'name': 'カメラ-前後', 'rel_offsets': [0x0060F], 'allowed_values': [0x00000003]},
-    {'name': 'カメラ-左右', 'rel_offsets': [0x00624], 'allowed_values': [0x00000004]},
-    {'name': 'ジャンプ', 'rel_offsets': [0x00133]},
-    {'name': 'ダッシュ/回避', 'rel_offsets': [0x001C7]},
-    {'name': '環境共鳴能力1', 'rel_offsets': [0x00204]},
-    {'name': '環境共鳴能力2', 'rel_offsets': [0x00227]},
-    {'name': '通常攻撃', 'rel_offsets': [0x0027E]},
-    {'name': '特殊攻撃', 'rel_offsets': [0x009E7]},
-    {'name': 'マスタリースキル1', 'rel_offsets': [0x002D5]},
-    {'name': 'マスタリースキル2', 'rel_offsets': [0x00312]},
-    {'name': 'マスタリースキル3', 'rel_offsets': [0x0034F]},
-    {'name': 'マスタリースキル4', 'rel_offsets': [0x0038C]},
-    {'name': '究極スキル', 'rel_offsets': [0x009AA]},
-    {'name': 'バトルイマジン1', 'rel_offsets': [0x00A24]},
-    {'name': 'バトルイマジン2', 'rel_offsets': [0x00A61]},
-    {'name': '左でアイテム切り替え', 'rel_offsets': [0x0102D]},
-    {'name': 'アイテム使用', 'rel_offsets': [0x003C9]},
-    {'name': '右でアイテム切り替え', 'rel_offsets': [0x0106A]},
-    {'name': 'アクション', 'rel_offsets': [0x00551, 0x0158F]},
-    {'name': 'ロックオン/切り替え', 'rel_offsets': [0x00406]},
-    {'name': 'エクストラスキル', 'rel_offsets': [0x00A9E]},
-    {'name': 'インタラクト解除', 'rel_offsets': [0x0045D]},
-    {'name': 'クエスト追跡', 'rel_offsets': [0x00514]},
-    {'name': 'UI非表示', 'rel_offsets': [0x004D7]},
-    {'name': 'クエストアイテムのクイック使用', 'rel_offsets': [0x0049A]},
-    {'name': 'マップON/OFF', 'rel_offsets': [0x00690]},
-    {'name': 'クエスト', 'rel_offsets': [0x006CD]},
-    {'name': 'ソーシャルモード', 'rel_offsets': [0x0070A]},
-    {'name': 'メニューを開く', 'rel_offsets': [0x0084D]},
-    {'name': 'メニューを閉じる', 'rel_offsets': [0x017CE]},
-    {'name': 'カーソル移動-上下', 'rel_offsets': [0x01F40]},
-    {'name': 'カーソル移動-左右', 'rel_offsets': [0x01F63]},
-    {'name': '撮影', 'rel_offsets': [0x0076A]},
-    {'name': 'ダンジョン退出', 'rel_offsets': [0x00810]},
-    {'name': 'アイテムを使用', 'rel_offsets': [0x0090D, 0x0186B]},
-    {'name': 'クイック操作', 'rel_offsets': [0x00BA4]},
-    {'name': '乗り物召喚/解除', 'rel_offsets': [0x00B44]},
-    {'name': '招待承認', 'rel_offsets': [0x00BE1, 0x01A89]},
-    {'name': '招待拒否', 'rel_offsets': [0x00C1E, 0x01AC6]},
-    {'name': 'オートバトル', 'rel_offsets': [0x00CBB]},
-    {'name': 'チャンネル', 'rel_offsets': [0x00C7E]},
-    {'name': 'イラストガイド', 'rel_offsets': [0x00CF8]},
-    {'name': 'クイックホイール', 'rel_offsets': [0x00D35]},
-    {'name': 'クイックホイール切替（左）', 'rel_offsets': [0x0289C]},
-    {'name': 'クイックホイール切替（右）', 'rel_offsets': [0x028B1]},
-    {'name': 'クイックホイール編集', 'rel_offsets': [0x028EE]},
-    {'name': 'クエスト切り替え（左）', 'rel_offsets': [0x00FB3]},
-    {'name': 'クエスト切り替え（右）', 'rel_offsets': [0x00FD6]},
-    {'name': 'ズームアウト', 'rel_offsets': [0x0058E]},
-    {'name': 'ズームイン', 'rel_offsets': [0x005A3]},
-    {'name': 'スキルパレットを開く', 'rel_offsets': [0x01227, 0x01F7D]},
-    {'name': 'ロールスキル1', 'rel_offsets': [0x01133]},
-    {'name': 'ロールスキル2', 'rel_offsets': [0x01170]},
-    {'name': 'ロールスキル3', 'rel_offsets': [0x011AD]},
-    {'name': 'ロールスキル4', 'rel_offsets': [0x011EA]},
-    {'name': 'ホーム設計図', 'rel_offsets': [0x0124A]},
-    {'name': '撮影モードカメラ移動-上下', 'rel_offsets': [0x0230E]},
-    {'name': '撮影モードカメラ移動-左右', 'rel_offsets': [0x02323]},
-    {'name': '撮影モードカメラパン-前後', 'rel_offsets': [0x0239F]},
-    {'name': '撮影モードカメラパン-左右', 'rel_offsets': [0x023B4]},
-    {'name': '撮影モード画面を非表示にする', 'rel_offsets': [0x021B8]},
-    {'name': '撮影モード撮影', 'rel_offsets': [0x0213E]},
-    {'name': '撮影モード設定メニュー', 'rel_offsets': [0x02688]},
-    {'name': '撮影モード参加者メニュー', 'rel_offsets': [0x026C5]},
-    {'name': '撮影モードカーソル呼出し', 'rel_offsets': [0x027B8]},
-    {'name': '撮影モードメニューを閉じる', 'rel_offsets': [0x0226F]},
-    {'name': '撮影モード移動-前後', 'rel_offsets': [0x02430], 'allowed_values': [0x00000001]},
-    {'name': '撮影モード移動-左右', 'rel_offsets': [0x02445], 'allowed_values': [0x00000002]},
-    {'name': '撮影モードカメラ-前後', 'rel_offsets': [0x0273A], 'allowed_values': [0x00000003]},
-    {'name': '撮影モードカメラ-左右', 'rel_offsets': [0x0274F], 'allowed_values': [0x00000004]},
-    {'name': '撮影モードジャンプ', 'rel_offsets': [0x0205D]},
-    {'name': '撮影モードダッシュ/回避', 'rel_offsets': [0x0217B]},
-    {'name': '撮影モード特殊攻撃', 'rel_offsets': [0x024B1]},
-    {'name': '撮影モードマスタリースキル1', 'rel_offsets': [0x024EE]},
-    {'name': '撮影モードマスタリースキル2', 'rel_offsets': [0x0252B]},
-    {'name': '撮影モードマスタリースキル3', 'rel_offsets': [0x02568]},
-    {'name': '撮影モードマスタリースキル4', 'rel_offsets': [0x025A5]},
-    {'name': '撮影モード究極スキル', 'rel_offsets': [0x0209A]},
-    {'name': '撮影モード乗り物召喚/解除', 'rel_offsets': [0x025E2]},
-    {'name': '撮影モードカーソル移動-上下', 'rel_offsets': [0x027FE]},
-    {'name': '撮影モードカーソル移動-左右', 'rel_offsets': [0x02821]},
-    {'name': '撮影モードズームアウト', 'rel_offsets': [0x020EC]},
-    {'name': '撮影モードズームイン', 'rel_offsets': [0x02101]},
-    {'name': '釣りモード竿移動-前後', 'rel_offsets': [0x02BB0], 'allowed_values': [0x00000001]},
-    {'name': '釣りモード竿移動-左右', 'rel_offsets': [0x02BC5], 'allowed_values': [0x00000002]},
-    {'name': '釣りモードキャスト/竿を引く', 'rel_offsets': [0x029A3]},
-    {'name': '釣りモード釣り/図鑑', 'rel_offsets': [0x029E0]},
-    {'name': '釣りモード釣り/研究', 'rel_offsets': [0x02A1D]},
-    {'name': '釣りモード釣り餌切替', 'rel_offsets': [0x02A5A]},
-    {'name': '釣りモード竿切替', 'rel_offsets': [0x02A97]},
-    {'name': '釣りモードモード/ガイド', 'rel_offsets': [0x02AD4]},
-    {'name': '釣りモード設定', 'rel_offsets': [0x02B11]},
-    {'name': '釣りモードメニューを閉じる', 'rel_offsets': [0x02C3F]},
+ACTION_GROUP_MAIN = "main"
+ACTION_GROUP_QUICK_WHEEL = "quick_wheel"
+ACTION_GROUP_PHOTO = "photo"
+ACTION_GROUP_FISHING = "fishing"
+
+
+def _make_action_id(group: str, name: str) -> str:
+    return f"{group}:{name}"
+
+
+def _make_action(
+    group: str,
+    name: str,
+    rel_offsets: list[int],
+    **extra: object,
+) -> dict:
+    return {
+        "id": _make_action_id(group, name),
+        "group": group,
+        "name": name,
+        "rel_offsets": rel_offsets,
+        **extra,
+    }
+
+
+# =========================
+# ゲームパッドの既知アクション一覧
+# Excelで確定した不明以外のアクションを、用途グループごとに定義する。
+# =========================
+CONTROLLER_MAIN_ACTIONS = [
+    _make_action(ACTION_GROUP_MAIN, '移動-前後', [0x000B2], allowed_values=[0x00000001]),
+    _make_action(ACTION_GROUP_MAIN, '移動-左右', [0x000C7], allowed_values=[0x00000002]),
+    _make_action(ACTION_GROUP_MAIN, 'カメラ-前後', [0x0060F], allowed_values=[0x00000003]),
+    _make_action(ACTION_GROUP_MAIN, 'カメラ-左右', [0x00624], allowed_values=[0x00000004]),
+    _make_action(ACTION_GROUP_MAIN, 'ジャンプ', [0x00133]),
+    _make_action(ACTION_GROUP_MAIN, 'ダッシュ/回避', [0x001C7]),
+    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力1', [0x00204]),
+    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力2', [0x00227]),
+    _make_action(ACTION_GROUP_MAIN, '通常攻撃', [0x0027E]),
+    _make_action(ACTION_GROUP_MAIN, '特殊攻撃', [0x009E7]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル1', [0x002D5]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル2', [0x00312]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル3', [0x0034F]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル4', [0x0038C]),
+    _make_action(ACTION_GROUP_MAIN, '究極スキル', [0x009AA]),
+    _make_action(ACTION_GROUP_MAIN, 'バトルイマジン1', [0x00A24]),
+    _make_action(ACTION_GROUP_MAIN, 'バトルイマジン2', [0x00A61]),
+    _make_action(ACTION_GROUP_MAIN, '左でアイテム切り替え', [0x0102D]),
+    _make_action(ACTION_GROUP_MAIN, 'アイテム使用', [0x003C9]),
+    _make_action(ACTION_GROUP_MAIN, '右でアイテム切り替え', [0x0106A]),
+    _make_action(ACTION_GROUP_MAIN, 'アクション', [0x00551, 0x0158F]),
+    _make_action(ACTION_GROUP_MAIN, 'ロックオン/切り替え', [0x00406]),
+    _make_action(ACTION_GROUP_MAIN, 'エクストラスキル', [0x00A9E]),
+    _make_action(ACTION_GROUP_MAIN, 'インタラクト解除', [0x0045D]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト追跡', [0x00514]),
+    _make_action(ACTION_GROUP_MAIN, 'UI非表示', [0x004D7]),
+    _make_action(ACTION_GROUP_MAIN, 'クエストアイテムのクイック使用', [0x0049A]),
+    _make_action(ACTION_GROUP_MAIN, 'マップON/OFF', [0x00690]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト', [0x006CD]),
+    _make_action(ACTION_GROUP_MAIN, 'ソーシャルモード', [0x0070A]),
+    _make_action(ACTION_GROUP_MAIN, 'メニューを開く', [0x0084D]),
+    _make_action(ACTION_GROUP_MAIN, 'メニューを閉じる', [0x017CE]),
+    _make_action(ACTION_GROUP_MAIN, 'カーソル移動-上下', [0x01F40]),
+    _make_action(ACTION_GROUP_MAIN, 'カーソル移動-左右', [0x01F63]),
+    _make_action(ACTION_GROUP_MAIN, '撮影', [0x0076A]),
+    _make_action(ACTION_GROUP_MAIN, 'ダンジョン退出', [0x00810]),
+    _make_action(ACTION_GROUP_MAIN, 'アイテムを使用', [0x0090D, 0x0186B]),
+    _make_action(ACTION_GROUP_MAIN, 'クイック操作', [0x00BA4]),
+    _make_action(ACTION_GROUP_MAIN, '乗り物召喚/解除', [0x00B44]),
+    _make_action(ACTION_GROUP_MAIN, '招待承認', [0x00BE1, 0x01A89]),
+    _make_action(ACTION_GROUP_MAIN, '招待拒否', [0x00C1E, 0x01AC6]),
+    _make_action(ACTION_GROUP_MAIN, 'オートバトル', [0x00CBB]),
+    _make_action(ACTION_GROUP_MAIN, 'チャンネル', [0x00C7E]),
+    _make_action(ACTION_GROUP_MAIN, 'イラストガイド', [0x00CF8]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール', [0x00D35]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（左）', [0x00FB3]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（右）', [0x00FD6]),
+    _make_action(ACTION_GROUP_MAIN, 'ズームアウト', [0x0058E]),
+    _make_action(ACTION_GROUP_MAIN, 'ズームイン', [0x005A3]),
+    _make_action(ACTION_GROUP_MAIN, 'スキルパレットを開く', [0x01227, 0x01F7D]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル1', [0x01133]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル2', [0x01170]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル3', [0x011AD]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル4', [0x011EA]),
+    _make_action(ACTION_GROUP_MAIN, 'ホーム設計図', [0x0124A]),
 ]
 
-SPECIAL_ACTIONS_WITHOUT_HELPER = {
-    "クイックホイール切替（左）",
-    "クイックホイール切替（右）",
-    "クイックホイール編集",
-}
+CONTROLLER_QUICK_WHEEL_ACTIONS = [
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイール切替（左）', [0x0289C]),
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイール切替（右）', [0x028B1]),
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイール編集', [0x028EE]),
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイールを閉じる', [0x0292B]),
+]
+
+CONTROLLER_PHOTO_MODE_ACTIONS = [
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ移動-上下', [0x0230E]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ移動-左右', [0x02323]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラパン-前後', [0x0239F]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラパン-左右', [0x023B4]),
+    _make_action(ACTION_GROUP_PHOTO, '画面を非表示にする', [0x021B8]),
+    _make_action(ACTION_GROUP_PHOTO, '撮影', [0x0213E]),
+    _make_action(ACTION_GROUP_PHOTO, '設定メニュー', [0x02688]),
+    _make_action(ACTION_GROUP_PHOTO, '参加者メニュー', [0x026C5]),
+    _make_action(ACTION_GROUP_PHOTO, 'カーソル呼出し', [0x027B8]),
+    _make_action(ACTION_GROUP_PHOTO, 'メニューを閉じる', [0x0226F]),
+    _make_action(ACTION_GROUP_PHOTO, '移動-前後', [0x02430], allowed_values=[0x00000001]),
+    _make_action(ACTION_GROUP_PHOTO, '移動-左右', [0x02445], allowed_values=[0x00000002]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ-前後', [0x0273A], allowed_values=[0x00000003]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ-左右', [0x0274F], allowed_values=[0x00000004]),
+    _make_action(ACTION_GROUP_PHOTO, 'ジャンプ', [0x0205D]),
+    _make_action(ACTION_GROUP_PHOTO, 'ダッシュ/回避', [0x0217B]),
+    _make_action(ACTION_GROUP_PHOTO, '特殊攻撃', [0x024B1]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル1', [0x024EE]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル2', [0x0252B]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル3', [0x02568]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル4', [0x025A5]),
+    _make_action(ACTION_GROUP_PHOTO, '究極スキル', [0x0209A]),
+    _make_action(ACTION_GROUP_PHOTO, '乗り物召喚/解除', [0x025E2]),
+    _make_action(ACTION_GROUP_PHOTO, 'カーソル移動-上下', [0x027FE]),
+    _make_action(ACTION_GROUP_PHOTO, 'カーソル移動-左右', [0x02821]),
+    _make_action(ACTION_GROUP_PHOTO, 'ズームアウト', [0x020EC]),
+    _make_action(ACTION_GROUP_PHOTO, 'ズームイン', [0x02101]),
+]
+
+CONTROLLER_FISHING_MODE_ACTIONS = [
+    _make_action(ACTION_GROUP_FISHING, '竿移動-前後', [0x02BB0], allowed_values=[0x00000001]),
+    _make_action(ACTION_GROUP_FISHING, '竿移動-左右', [0x02BC5], allowed_values=[0x00000002]),
+    _make_action(ACTION_GROUP_FISHING, 'キャスト/竿を引く', [0x029A3]),
+    _make_action(ACTION_GROUP_FISHING, '釣り/図鑑', [0x029E0]),
+    _make_action(ACTION_GROUP_FISHING, '釣り/研究', [0x02A1D]),
+    _make_action(ACTION_GROUP_FISHING, '釣り餌切替', [0x02A5A]),
+    _make_action(ACTION_GROUP_FISHING, '竿切替', [0x02A97]),
+    _make_action(ACTION_GROUP_FISHING, 'モード/ガイド', [0x02AD4]),
+    _make_action(ACTION_GROUP_FISHING, '設定', [0x02B11]),
+    _make_action(ACTION_GROUP_FISHING, 'メニューを閉じる', [0x02C3F]),
+]
+
+# bytes読込・保存など全件走査が必要な処理だけ、明示的に全グループを結合して使う。
+ACTIONS = [
+    *CONTROLLER_MAIN_ACTIONS,
+    *CONTROLLER_QUICK_WHEEL_ACTIONS,
+    *CONTROLLER_PHOTO_MODE_ACTIONS,
+    *CONTROLLER_FISHING_MODE_ACTIONS,
+]
 
 # =========================
 # 入力レコード種別
@@ -423,330 +454,357 @@ KEYMOUSE_LABEL_TO_RECORD = {
 }
 KEYMOUSE_COMBO_VALUES = [label for _, _, label in KEYMOUSE_OPTIONS]
 
-# これらのキーボード/マウス操作は、ゲーム内では L Ctrl との同時入力として使う。
-KEYMOUSE_LCTRL_PREFIX_ACTION_NAMES = {
-    "UI非表示",
-    "パーティボイス切り替え",
-    "ロールスキル1",
-    "ロールスキル2",
-    "ロールスキル3",
-    "ロールスキル4",
-}
-
 # =========================
 # キーボード/マウスの既知アクション一覧
-# Excel「アクション一覧」の不明アクション以外をすべて収録
+# Excelで確定した不明以外のアクションを、用途グループごとに定義する。
 # =========================
-KEYMOUSE_ACTIONS = [
-    {'name': '移動-前', 'rel_offsets': [0x00059, 0x012BD]},
-    {'name': '移動-後', 'rel_offsets': [0x0006E, 0x012D2]},
-    {'name': '移動-左', 'rel_offsets': [0x00083, 0x012E7]},
-    {'name': '移動-右', 'rel_offsets': [0x00098, 0x012FC]},
-    {'name': '歩く/走る切替', 'rel_offsets': [0x00156, 0x01371]},
-    {'name': 'ジャンプ', 'rel_offsets': [0x00119, 0x0134E]},
-    {'name': 'ダッシュ/回避1', 'rel_offsets': [0x00193, 0x013AE]},
-    {'name': 'ダッシュ/回避2', 'rel_offsets': [0x001AD]},
-    {'name': '環境共鳴能力1', 'rel_offsets': [0x001EA, 0x013D1]},
-    {'name': '環境共鳴能力2', 'rel_offsets': [0x00241]},
-    {'name': '通常攻撃', 'rel_offsets': [0x00264], 'allowed_input_types': [INPUT_TYPE_MOUSE]},
-    {'name': '特殊攻撃', 'rel_offsets': [0x009CD, 0x01934]},
-    {'name': 'マスタリースキル1', 'rel_offsets': [0x002BB, 0x0143A]},
-    {'name': 'マスタリースキル2', 'rel_offsets': [0x002F8, 0x0145D]},
-    {'name': 'マスタリースキル3', 'rel_offsets': [0x00335, 0x01480]},
-    {'name': 'マスタリースキル4', 'rel_offsets': [0x00372, 0x014A3]},
-    {'name': '究極スキル', 'rel_offsets': [0x00990, 0x01911]},
-    {'name': 'バトルイマジン1', 'rel_offsets': [0x00A0A, 0x01957]},
-    {'name': 'バトルイマジン2', 'rel_offsets': [0x00A47, 0x0197A]},
-    {'name': '左でアイテム切り替え', 'rel_offsets': [0x01013, 0x01E28]},
-    {'name': 'アイテム使用', 'rel_offsets': [0x003AF, 0x014C6]},
-    {'name': '右でアイテム切り替え', 'rel_offsets': [0x01050, 0x01E4B]},
-    {'name': 'アクション', 'rel_offsets': [0x00537, 0x01598]},
-    {'name': 'ロックオン/切り替え1', 'rel_offsets': [0x003EC, 0x014E9]},
-    {'name': 'ロックオン/切り替え2', 'rel_offsets': [0x00420]},
-    {'name': 'エクストラスキル', 'rel_offsets': [0x00A84, 0x0199D]},
-    {'name': 'インタラクト解除', 'rel_offsets': [0x00443, 0x0150C]},
-    {'name': 'クエスト追跡', 'rel_offsets': [0x004FA, 0x01575]},
-    {'name': 'UI非表示', 'rel_offsets': [0x004BD, 0x01552]},
-    {'name': 'クエストアイテムのクイック使用', 'rel_offsets': [0x00480, 0x0152F]},
-    {'name': 'おすすめイベント', 'rel_offsets': [0x00B07, 0x01A06]},
-    {'name': 'マップON/OFF', 'rel_offsets': [0x00676, 0x01679]},
-    {'name': 'クエスト', 'rel_offsets': [0x006B3, 0x0169C]},
-    {'name': 'ソーシャルモード', 'rel_offsets': [0x006F0, 0x016BF]},
-    {'name': 'トーク', 'rel_offsets': [0x00C41, 0x01B0C]},
-    {'name': 'キャラクター', 'rel_offsets': [0x0072D, 0x016E2]},
-    {'name': 'ギルド', 'rel_offsets': [0x00E70, 0x01CD3]},
-    {'name': 'チャット画面チャンネル切り替え-上', 'rel_offsets': [0x0108D]},
-    {'name': 'チャット画面チャンネル切り替え-下', 'rel_offsets': [0x010B0]},
-    {'name': 'チャット入力チャンネル切り替え-左', 'rel_offsets': [0x010D3]},
-    {'name': 'チャット入力チャンネル切り替え-右', 'rel_offsets': [0x010F6]},
-    {'name': 'メニューを開く', 'rel_offsets': [0x00833]},
-    {'name': 'メニューを閉じる', 'rel_offsets': [0x017B4]},
-    {'name': 'マウス呼出し', 'rel_offsets': [0x00870, 0x017F1]},
-    {'name': '撮影', 'rel_offsets': [0x00750, 0x01705]},
-    {'name': '所持品', 'rel_offsets': [0x0078D, 0x01728]},
-    {'name': 'パーティ', 'rel_offsets': [0x007B0, 0x0174B]},
-    {'name': 'シーズンセンター', 'rel_offsets': [0x007D3, 0x0176E]},
-    {'name': 'ダンジョン退出', 'rel_offsets': [0x007F6, 0x01791]},
-    {'name': 'アビリティ', 'rel_offsets': [0x008D0, 0x01851]},
-    {'name': 'アイテムを使用', 'rel_offsets': [0x008F3, 0x01874]},
-    {'name': 'クイック操作', 'rel_offsets': [0x00B8A, 0x01A6F]},
-    {'name': '乗り物召喚/解除', 'rel_offsets': [0x00B2A, 0x01A29]},
-    {'name': 'パーティボイス切り替え', 'rel_offsets': [0x00B67, 0x01A4C]},
-    {'name': '招待承認', 'rel_offsets': [0x00BC7, 0x01A92]},
-    {'name': '招待拒否', 'rel_offsets': [0x00C04, 0x01ACF]},
-    {'name': 'オートバトル', 'rel_offsets': [0x00CA1, 0x01B52]},
-    {'name': 'チャンネル', 'rel_offsets': [0x00C64, 0x01B2F]},
-    {'name': 'イラストガイド', 'rel_offsets': [0x00CDE, 0x01B75]},
-    {'name': 'クイックホイール', 'rel_offsets': [0x00D1B, 0x01B98]},
-    {'name': 'クイックホイール切替', 'rel_offsets': [0x02882]},
-    {'name': 'クイックホイール編集', 'rel_offsets': [0x028D4]},
-    {'name': 'オートラン', 'rel_offsets': [0x00F39, 0x01D9C]},
-    {'name': 'クエスト切り替え（左）', 'rel_offsets': [0x00F99, 0x01DE2]},
-    {'name': 'クエスト切り替え（右）', 'rel_offsets': [0x00FF0]},
-    {'name': 'ホーム編集', 'rel_offsets': [0x00F16, 0x01D79]},
-    {'name': 'ズームアウト/ズームイン', 'rel_offsets': [0x00574, 0x00893, 0x015D5, 0x01814]},
-    {'name': 'スキルパレットを開く', 'rel_offsets': [0x0120D, 0x01F86]},
-    {'name': 'ロールスキル1', 'rel_offsets': [0x01119]},
-    {'name': 'ロールスキル2', 'rel_offsets': [0x01156]},
-    {'name': 'ロールスキル3', 'rel_offsets': [0x01193]},
-    {'name': 'ロールスキル4', 'rel_offsets': [0x011D0]},
-    {'name': 'ホーム設計図', 'rel_offsets': [0x01264, 0x01FDD]},
-    {'name': 'アテンドイマジンを召喚する', 'rel_offsets': [0x01287, 0x02000]},
-    {'name': 'クイックホイール-スロット1', 'rel_offsets': [0x00D58, 0x01BBB]},
-    {'name': 'クイックホイール-スロット2', 'rel_offsets': [0x00D7B, 0x01BDE]},
-    {'name': 'クイックホイール-スロット3', 'rel_offsets': [0x00D9E, 0x01C01]},
-    {'name': 'クイックホイール-スロット4', 'rel_offsets': [0x00DC1, 0x01C24]},
-    {'name': 'クイックホイール-スロット5', 'rel_offsets': [0x00DE4, 0x01C47]},
-    {'name': 'クイックホイール-スロット6', 'rel_offsets': [0x00E07, 0x01C6A]},
-    {'name': 'クイックホイール-スロット7', 'rel_offsets': [0x00E2A, 0x01C8D]},
-    {'name': 'クイックホイール-スロット8', 'rel_offsets': [0x00E4D, 0x01CB0]},
-    {'name': 'スキル', 'rel_offsets': [0x00E93, 0x01CF6]},
-    {'name': '装備', 'rel_offsets': [0x00EB6, 0x01D19]},
-    {'name': '撮影モードカメラ移動-上', 'rel_offsets': [0x022B5]},
-    {'name': '撮影モードカメラ移動-下', 'rel_offsets': [0x022CA]},
-    {'name': '撮影モードカメラ移動-左', 'rel_offsets': [0x022DF]},
-    {'name': '撮影モードカメラ移動-右', 'rel_offsets': [0x022F4]},
-    {'name': '撮影モードカメラパン-前', 'rel_offsets': [0x02346]},
-    {'name': '撮影モードカメラパン-後', 'rel_offsets': [0x0235B]},
-    {'name': '撮影モードカメラパン-左', 'rel_offsets': [0x02370]},
-    {'name': '撮影モードカメラパン-右', 'rel_offsets': [0x02385]},
-    {'name': '撮影モードズームアウト', 'rel_offsets': [0x020BD]},
-    {'name': '撮影モードズームイン', 'rel_offsets': [0x020D2]},
-    {'name': '撮影モード画面を非表示にする', 'rel_offsets': [0x0219E]},
-    {'name': '撮影モード撮影', 'rel_offsets': [0x02124]},
-    {'name': '撮影モード設定メニュー', 'rel_offsets': [0x0266E]},
-    {'name': '撮影モード参加者メニュー', 'rel_offsets': [0x026AB]},
-    {'name': '撮影モード移動-前', 'rel_offsets': [0x023D7]},
-    {'name': '撮影モード移動-後', 'rel_offsets': [0x023EC]},
-    {'name': '撮影モード移動-左', 'rel_offsets': [0x02401]},
-    {'name': '撮影モード移動-右', 'rel_offsets': [0x02416]},
-    {'name': '撮影モードジャンプ', 'rel_offsets': [0x02043]},
-    {'name': '撮影モードダッシュ/回避', 'rel_offsets': [0x02161]},
-    {'name': '撮影モード歩く/走る切替', 'rel_offsets': [0x026E8]},
-    {'name': '撮影モード特殊攻撃', 'rel_offsets': [0x02497]},
-    {'name': '撮影モードマスタリースキル1', 'rel_offsets': [0x024D4]},
-    {'name': '撮影モードマスタリースキル2', 'rel_offsets': [0x02511]},
-    {'name': '撮影モードマスタリースキル3', 'rel_offsets': [0x0254E]},
-    {'name': '撮影モードマスタリースキル4', 'rel_offsets': [0x0258B]},
-    {'name': '撮影モード究極スキル', 'rel_offsets': [0x02080]},
-    {'name': '撮影モード乗り物召喚/解除', 'rel_offsets': [0x025C8]},
-    {'name': '撮影モード撮影モード終了', 'rel_offsets': [0x02605]},
-    {'name': '撮影モードメニューを閉じる', 'rel_offsets': [0x02255]},
-    {'name': '釣りモードキャスト/竿を引く', 'rel_offsets': [0x02989]},
-    {'name': '釣りモード竿移動-前', 'rel_offsets': [0x02B57]},
-    {'name': '釣りモード竿移動-後', 'rel_offsets': [0x02B6C]},
-    {'name': '釣りモード竿移動-左', 'rel_offsets': [0x02B81]},
-    {'name': '釣りモード竿移動-右', 'rel_offsets': [0x02B96]},
-    {'name': '釣りモード釣り/図鑑', 'rel_offsets': [0x029C6]},
-    {'name': '釣りモード釣り/研究', 'rel_offsets': [0x02A03]},
-    {'name': '釣りモード釣り餌切替', 'rel_offsets': [0x02A40]},
-    {'name': '釣りモード竿切替', 'rel_offsets': [0x02A7D]},
-    {'name': '釣りモードモード/ガイド', 'rel_offsets': [0x02ABA]},
-    {'name': '釣りモード設定', 'rel_offsets': [0x02AF7]},
-    {'name': '釣りモードマウス呼出し', 'rel_offsets': [0x02B34]},
-    {'name': '釣りモードメニューを閉じる', 'rel_offsets': [0x02C25]},
+KEYMOUSE_MAIN_ACTIONS = [
+    _make_action(ACTION_GROUP_MAIN, '移動-前', [0x00059, 0x012BD]),
+    _make_action(ACTION_GROUP_MAIN, '移動-後', [0x0006E, 0x012D2]),
+    _make_action(ACTION_GROUP_MAIN, '移動-左', [0x00083, 0x012E7]),
+    _make_action(ACTION_GROUP_MAIN, '移動-右', [0x00098, 0x012FC]),
+    _make_action(ACTION_GROUP_MAIN, '歩く/走る切替', [0x00156, 0x01371]),
+    _make_action(ACTION_GROUP_MAIN, 'ジャンプ', [0x00119, 0x0134E]),
+    _make_action(ACTION_GROUP_MAIN, 'ダッシュ/回避1', [0x00193, 0x013AE]),
+    _make_action(ACTION_GROUP_MAIN, 'ダッシュ/回避2', [0x001AD]),
+    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力1', [0x001EA, 0x013D1]),
+    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力2', [0x00241]),
+    _make_action(ACTION_GROUP_MAIN, '通常攻撃', [0x00264], allowed_input_types=[INPUT_TYPE_MOUSE]),
+    _make_action(ACTION_GROUP_MAIN, '特殊攻撃', [0x009CD, 0x01934]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル1', [0x002BB, 0x0143A]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル2', [0x002F8, 0x0145D]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル3', [0x00335, 0x01480]),
+    _make_action(ACTION_GROUP_MAIN, 'マスタリースキル4', [0x00372, 0x014A3]),
+    _make_action(ACTION_GROUP_MAIN, '究極スキル', [0x00990, 0x01911]),
+    _make_action(ACTION_GROUP_MAIN, 'バトルイマジン1', [0x00A0A, 0x01957]),
+    _make_action(ACTION_GROUP_MAIN, 'バトルイマジン2', [0x00A47, 0x0197A]),
+    _make_action(ACTION_GROUP_MAIN, '左でアイテム切り替え', [0x01013, 0x01E28]),
+    _make_action(ACTION_GROUP_MAIN, 'アイテム使用', [0x003AF, 0x014C6]),
+    _make_action(ACTION_GROUP_MAIN, '右でアイテム切り替え', [0x01050, 0x01E4B]),
+    _make_action(ACTION_GROUP_MAIN, 'アクション', [0x00537, 0x01598]),
+    _make_action(ACTION_GROUP_MAIN, 'ロックオン/切り替え1', [0x003EC, 0x014E9]),
+    _make_action(ACTION_GROUP_MAIN, 'ロックオン/切り替え2', [0x00420]),
+    _make_action(ACTION_GROUP_MAIN, 'エクストラスキル', [0x00A84, 0x0199D]),
+    _make_action(ACTION_GROUP_MAIN, 'インタラクト解除', [0x00443, 0x0150C]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト追跡', [0x004FA, 0x01575]),
+    _make_action(ACTION_GROUP_MAIN, 'UI非表示', [0x004BD, 0x01552]),
+    _make_action(ACTION_GROUP_MAIN, 'クエストアイテムのクイック使用', [0x00480, 0x0152F]),
+    _make_action(ACTION_GROUP_MAIN, 'おすすめイベント', [0x00B07, 0x01A06]),
+    _make_action(ACTION_GROUP_MAIN, 'マップON/OFF', [0x00676, 0x01679]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト', [0x006B3, 0x0169C]),
+    _make_action(ACTION_GROUP_MAIN, 'ソーシャルモード', [0x006F0, 0x016BF]),
+    _make_action(ACTION_GROUP_MAIN, 'トーク', [0x00C41, 0x01B0C]),
+    _make_action(ACTION_GROUP_MAIN, 'キャラクター', [0x0072D, 0x016E2]),
+    _make_action(ACTION_GROUP_MAIN, 'ギルド', [0x00E70, 0x01CD3]),
+    _make_action(ACTION_GROUP_MAIN, 'チャット画面チャンネル切り替え-上', [0x0108D]),
+    _make_action(ACTION_GROUP_MAIN, 'チャット画面チャンネル切り替え-下', [0x010B0]),
+    _make_action(ACTION_GROUP_MAIN, 'チャット入力チャンネル切り替え-左', [0x010D3]),
+    _make_action(ACTION_GROUP_MAIN, 'チャット入力チャンネル切り替え-右', [0x010F6]),
+    _make_action(ACTION_GROUP_MAIN, 'メニューを開く', [0x00833]),
+    _make_action(ACTION_GROUP_MAIN, 'メニューを閉じる', [0x017B4]),
+    _make_action(ACTION_GROUP_MAIN, 'マウス呼出し', [0x00870, 0x017F1]),
+    _make_action(ACTION_GROUP_MAIN, '撮影', [0x00750, 0x01705]),
+    _make_action(ACTION_GROUP_MAIN, '所持品', [0x0078D, 0x01728]),
+    _make_action(ACTION_GROUP_MAIN, 'パーティ', [0x007B0, 0x0174B]),
+    _make_action(ACTION_GROUP_MAIN, 'シーズンセンター', [0x007D3, 0x0176E]),
+    _make_action(ACTION_GROUP_MAIN, 'ダンジョン退出', [0x007F6, 0x01791]),
+    _make_action(ACTION_GROUP_MAIN, 'アビリティ', [0x008D0, 0x01851]),
+    _make_action(ACTION_GROUP_MAIN, 'アイテムを使用', [0x008F3, 0x01874]),
+    _make_action(ACTION_GROUP_MAIN, 'クイック操作', [0x00B8A, 0x01A6F]),
+    _make_action(ACTION_GROUP_MAIN, '乗り物召喚/解除', [0x00B2A, 0x01A29]),
+    _make_action(ACTION_GROUP_MAIN, 'パーティボイス切り替え', [0x00B67, 0x01A4C]),
+    _make_action(ACTION_GROUP_MAIN, '招待承認', [0x00BC7, 0x01A92]),
+    _make_action(ACTION_GROUP_MAIN, '招待拒否', [0x00C04, 0x01ACF]),
+    _make_action(ACTION_GROUP_MAIN, 'オートバトル', [0x00CA1, 0x01B52]),
+    _make_action(ACTION_GROUP_MAIN, 'チャンネル', [0x00C64, 0x01B2F]),
+    _make_action(ACTION_GROUP_MAIN, 'イラストガイド', [0x00CDE, 0x01B75]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール', [0x00D1B, 0x01B98]),
+    _make_action(ACTION_GROUP_MAIN, 'オートラン', [0x00F39, 0x01D9C]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（左）', [0x00F99, 0x01DE2]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（右）', [0x00FF0]),
+    _make_action(ACTION_GROUP_MAIN, 'ホーム編集', [0x00F16, 0x01D79]),
+    _make_action(ACTION_GROUP_MAIN, 'ズームアウト/ズームイン', [0x00574, 0x00893, 0x015D5, 0x01814]),
+    _make_action(ACTION_GROUP_MAIN, 'スキルパレットを開く', [0x0120D, 0x01F86]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル1', [0x01119]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル2', [0x01156]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル3', [0x01193]),
+    _make_action(ACTION_GROUP_MAIN, 'ロールスキル4', [0x011D0]),
+    _make_action(ACTION_GROUP_MAIN, 'ホーム設計図', [0x01264, 0x01FDD]),
+    _make_action(ACTION_GROUP_MAIN, 'アテンドイマジンを召喚する', [0x01287, 0x02000]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット1', [0x00D58, 0x01BBB]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット2', [0x00D7B, 0x01BDE]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット3', [0x00D9E, 0x01C01]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット4', [0x00DC1, 0x01C24]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット5', [0x00DE4, 0x01C47]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット6', [0x00E07, 0x01C6A]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット7', [0x00E2A, 0x01C8D]),
+    _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット8', [0x00E4D, 0x01CB0]),
+    _make_action(ACTION_GROUP_MAIN, 'スキル', [0x00E93, 0x01CF6]),
+    _make_action(ACTION_GROUP_MAIN, '装備', [0x00EB6, 0x01D19]),
 ]
+
+KEYMOUSE_QUICK_WHEEL_ACTIONS = [
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイール切替', [0x02882]),
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイール編集', [0x028D4]),
+    _make_action(ACTION_GROUP_QUICK_WHEEL, 'クイックホイールを閉じる', [0x02911]),
+]
+
+KEYMOUSE_PHOTO_MODE_ACTIONS = [
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ移動-上', [0x022B5]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ移動-下', [0x022CA]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ移動-左', [0x022DF]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラ移動-右', [0x022F4]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラパン-前', [0x02346]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラパン-後', [0x0235B]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラパン-左', [0x02370]),
+    _make_action(ACTION_GROUP_PHOTO, 'カメラパン-右', [0x02385]),
+    _make_action(ACTION_GROUP_PHOTO, 'ズームアウト', [0x020BD]),
+    _make_action(ACTION_GROUP_PHOTO, 'ズームイン', [0x020D2]),
+    _make_action(ACTION_GROUP_PHOTO, '画面を非表示にする', [0x0219E]),
+    _make_action(ACTION_GROUP_PHOTO, '撮影', [0x02124]),
+    _make_action(ACTION_GROUP_PHOTO, '設定メニュー', [0x0266E]),
+    _make_action(ACTION_GROUP_PHOTO, '参加者メニュー', [0x026AB]),
+    _make_action(ACTION_GROUP_PHOTO, '移動-前', [0x023D7]),
+    _make_action(ACTION_GROUP_PHOTO, '移動-後', [0x023EC]),
+    _make_action(ACTION_GROUP_PHOTO, '移動-左', [0x02401]),
+    _make_action(ACTION_GROUP_PHOTO, '移動-右', [0x02416]),
+    _make_action(ACTION_GROUP_PHOTO, 'ジャンプ', [0x02043]),
+    _make_action(ACTION_GROUP_PHOTO, 'ダッシュ/回避', [0x02161]),
+    _make_action(ACTION_GROUP_PHOTO, '歩く/走る切替', [0x026E8]),
+    _make_action(ACTION_GROUP_PHOTO, '特殊攻撃', [0x02497]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル1', [0x024D4]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル2', [0x02511]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル3', [0x0254E]),
+    _make_action(ACTION_GROUP_PHOTO, 'マスタリースキル4', [0x0258B]),
+    _make_action(ACTION_GROUP_PHOTO, '究極スキル', [0x02080]),
+    _make_action(ACTION_GROUP_PHOTO, '乗り物召喚/解除', [0x025C8]),
+    _make_action(ACTION_GROUP_PHOTO, '終了', [0x02605]),
+    _make_action(ACTION_GROUP_PHOTO, 'メニューを閉じる', [0x02255]),
+]
+
+KEYMOUSE_FISHING_MODE_ACTIONS = [
+    _make_action(ACTION_GROUP_FISHING, 'キャスト/竿を引く', [0x02989]),
+    _make_action(ACTION_GROUP_FISHING, '竿移動-前', [0x02B57]),
+    _make_action(ACTION_GROUP_FISHING, '竿移動-後', [0x02B6C]),
+    _make_action(ACTION_GROUP_FISHING, '竿移動-左', [0x02B81]),
+    _make_action(ACTION_GROUP_FISHING, '竿移動-右', [0x02B96]),
+    _make_action(ACTION_GROUP_FISHING, '釣り/図鑑', [0x029C6]),
+    _make_action(ACTION_GROUP_FISHING, '釣り/研究', [0x02A03]),
+    _make_action(ACTION_GROUP_FISHING, '釣り餌切替', [0x02A40]),
+    _make_action(ACTION_GROUP_FISHING, '竿切替', [0x02A7D]),
+    _make_action(ACTION_GROUP_FISHING, 'モード/ガイド', [0x02ABA]),
+    _make_action(ACTION_GROUP_FISHING, '設定', [0x02AF7]),
+    _make_action(ACTION_GROUP_FISHING, 'マウス呼出し', [0x02B34]),
+    _make_action(ACTION_GROUP_FISHING, 'メニューを閉じる', [0x02C25]),
+    _make_action(ACTION_GROUP_FISHING, 'トーク', [0x02C62]),
+    _make_action(ACTION_GROUP_FISHING, 'チャット画面チャンネル切り替え-下', [0x02C85]),
+    _make_action(ACTION_GROUP_FISHING, 'チャット画面チャンネル切り替え-上', [0x02CA8]),
+    _make_action(ACTION_GROUP_FISHING, 'チャット入力チャンネル切り替え-左', [0x02CCB]),
+    _make_action(ACTION_GROUP_FISHING, 'チャット入力チャンネル切り替え-右', [0x02CEE]),
+]
+
+# bytes読込・保存など全件走査が必要な処理だけ、明示的に全グループを結合して使う。
+KEYMOUSE_ACTIONS = [
+    *KEYMOUSE_MAIN_ACTIONS,
+    *KEYMOUSE_QUICK_WHEEL_ACTIONS,
+    *KEYMOUSE_PHOTO_MODE_ACTIONS,
+    *KEYMOUSE_FISHING_MODE_ACTIONS,
+]
+
+# これらのキーボード/マウス操作は、ゲーム内では L Ctrl との同時入力として使う。
+KEYMOUSE_LCTRL_PREFIX_ACTION_IDS = {
+    _make_action_id(ACTION_GROUP_MAIN, "UI非表示"),
+    _make_action_id(ACTION_GROUP_MAIN, "パーティボイス切り替え"),
+    _make_action_id(ACTION_GROUP_MAIN, "ロールスキル1"),
+    _make_action_id(ACTION_GROUP_MAIN, "ロールスキル2"),
+    _make_action_id(ACTION_GROUP_MAIN, "ロールスキル3"),
+    _make_action_id(ACTION_GROUP_MAIN, "ロールスキル4"),
+}
 
 # =========================
 # lodef / UU1 兼用補正
 # 一部アクションでは controller と keymouse の並びが入れ替わる。
-# ACTIONS / KEYMOUSE_ACTIONS 自体は保持し、typeで実際のvalue位置を選ぶ。
+# group + name で固定した id を使い、typeで実際のvalue位置を選ぶ。
 # =========================
 ACTION_CONTROLLER_OFFSET_ALIASES = {
-    "環境共鳴能力2": [0x00241],
-    "クエスト切り替え（右）": [0x00FF0],
-    "ホーム設計図": [0x01264],
+    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00241],
+    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FF0],
+    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
 }
 
 ACTION_KEYMOUSE_OFFSET_ALIASES = {
-    "環境共鳴能力2": [0x00227],
-    "クエスト切り替え（右）": [0x00FD6],
-    "ホーム設計図": [0x0124A],
+    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00227],
+    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FD6],
+    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x0124A],
 }
 
 
 # =========================
-# 撮影モード / 釣りモードのキー設定
-# 同じ役割の通常アクションが存在するモード側アクションは、
-# 単独設定をオフにすると通常アクションへ追従する。
+# 撮影モード / 釣りモードの連動
+# モード名は接頭辞で判定せず、専用グループと内部 id で区別する。
 # =========================
-PHOTO_MODE_PREFIX = "撮影モード"
-FISHING_MODE_PREFIX = "釣りモード"
-MODE_PREFIXES = (PHOTO_MODE_PREFIX, FISHING_MODE_PREFIX)
+LEGACY_LAYOUT_PREFIX_BY_GROUP = {
+    ACTION_GROUP_PHOTO: "撮影モード",
+    ACTION_GROUP_FISHING: "釣りモード",
+}
+
+
+def _legacy_layout_action_key(action: dict) -> str:
+    """旧JSONの接頭辞付きアクション名を、読み込み時だけ解決する。"""
+    if (
+        action["group"] == ACTION_GROUP_PHOTO
+        and action["name"] == "終了"
+    ):
+        return "撮影モード撮影モード終了"
+    return f"{LEGACY_LAYOUT_PREFIX_BY_GROUP.get(action['group'], '')}{action['name']}"
+
+
+def _get_profile_action_entry(profile_actions: dict, action: dict) -> Optional[dict]:
+    """新しいidキーを優先し、旧JSONの接頭辞付きキーも読み込む。"""
+    saved = profile_actions.get(action["id"])
+    if isinstance(saved, dict):
+        return saved
+
+    legacy_key = _legacy_layout_action_key(action)
+    saved = profile_actions.get(legacy_key)
+    if isinstance(saved, dict):
+        return saved
+    return None
+
 
 # この撮影モードアクションは、通常アクションと同名でも自動連動しない。
 # 「撮影モードのアクションを単独で設定する」がオフでも、個別に編集できる。
 PHOTO_MODE_UNLINKED_ACTION_NAMES = {
-    "撮影モード撮影",
+    "撮影",
 }
 
 # ゲームパッド側だけ、通常の「メニューを閉じる」と連動させない。
 CONTROLLER_PHOTO_MODE_UNLINKED_ACTION_NAMES = (
     PHOTO_MODE_UNLINKED_ACTION_NAMES
-    | {"撮影モードメニューを閉じる"}
+    | {"メニューを閉じる"}
 )
 CONTROLLER_FISHING_MODE_UNLINKED_ACTION_NAMES = {
-    "釣りモードメニューを閉じる",
+    "メニューを閉じる",
 }
-
 FISHING_MODE_UNLINKED_ACTION_NAMES: set[str] = set()
 
 
-def _is_mode_action_name(action_name: str) -> bool:
-    return action_name.startswith(MODE_PREFIXES)
-
-
-CONTROLLER_DIRECTION_ACTION_NAMES = {
-    "移動-前後",
-    "移動-左右",
-    "カメラ-前後",
-    "カメラ-左右",
-    "カーソル移動-上下",
-    "カーソル移動-左右",
-    "撮影モードカメラ移動-上下",
-    "撮影モードカメラ移動-左右",
-    "撮影モードカメラパン-前後",
-    "撮影モードカメラパン-左右",
-    "撮影モード移動-前後",
-    "撮影モード移動-左右",
-    "撮影モードカメラ-前後",
-    "撮影モードカメラ-左右",
-    "撮影モードカーソル移動-上下",
-    "撮影モードカーソル移動-左右",
-    "釣りモード竿移動-前後",
-    "釣りモード竿移動-左右",
+CONTROLLER_DIRECTION_ACTION_IDS = {
+    _make_action_id(ACTION_GROUP_MAIN, "移動-前後"),
+    _make_action_id(ACTION_GROUP_MAIN, "移動-左右"),
+    _make_action_id(ACTION_GROUP_MAIN, "カメラ-前後"),
+    _make_action_id(ACTION_GROUP_MAIN, "カメラ-左右"),
+    _make_action_id(ACTION_GROUP_MAIN, "カーソル移動-上下"),
+    _make_action_id(ACTION_GROUP_MAIN, "カーソル移動-左右"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カメラ移動-上下"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カメラ移動-左右"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カメラパン-前後"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カメラパン-左右"),
+    _make_action_id(ACTION_GROUP_PHOTO, "移動-前後"),
+    _make_action_id(ACTION_GROUP_PHOTO, "移動-左右"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カメラ-前後"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カメラ-左右"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カーソル移動-上下"),
+    _make_action_id(ACTION_GROUP_PHOTO, "カーソル移動-左右"),
+    _make_action_id(ACTION_GROUP_FISHING, "竿移動-前後"),
+    _make_action_id(ACTION_GROUP_FISHING, "竿移動-左右"),
 }
 
 # 方向入力はすべて、L前後 / L左右 / R前後 / R左右の4択と補助キーに対応させる。
 for _direction_action in ACTIONS:
-    if _direction_action["name"] in CONTROLLER_DIRECTION_ACTION_NAMES:
+    if _direction_action["id"] in CONTROLLER_DIRECTION_ACTION_IDS:
         _direction_action["allowed_values"] = [1, 2, 3, 4]
         _direction_action["uses_helper"] = True
 del _direction_action
 
-CONTROLLER_MAIN_ACTIONS = [
-    action for action in ACTIONS
-    if not _is_mode_action_name(action["name"])
-]
-CONTROLLER_PHOTO_MODE_ACTIONS = [
-    action for action in ACTIONS
-    if action["name"].startswith(PHOTO_MODE_PREFIX)
-]
-CONTROLLER_FISHING_MODE_ACTIONS = [
-    action for action in ACTIONS
-    if action["name"].startswith(FISHING_MODE_PREFIX)
-]
-KEYMOUSE_MAIN_ACTIONS = [
-    action for action in KEYMOUSE_ACTIONS
-    if not _is_mode_action_name(action["name"])
-]
-KEYMOUSE_PHOTO_MODE_ACTIONS = [
-    action for action in KEYMOUSE_ACTIONS
-    if action["name"].startswith(PHOTO_MODE_PREFIX)
-]
-KEYMOUSE_FISHING_MODE_ACTIONS = [
-    action for action in KEYMOUSE_ACTIONS
-    if action["name"].startswith(FISHING_MODE_PREFIX)
-]
+# 補助キーUIを持たない項目も、名前ではなくグループ込みのidで固定する。
+SPECIAL_CONTROLLER_ACTION_IDS_WITHOUT_HELPER = {
+    _make_action_id(ACTION_GROUP_QUICK_WHEEL, "クイックホイール切替（左）"),
+    _make_action_id(ACTION_GROUP_QUICK_WHEEL, "クイックホイール切替（右）"),
+    _make_action_id(ACTION_GROUP_QUICK_WHEEL, "クイックホイール編集"),
+}
 
 
 def _build_mode_links(
-    actions: list[dict],
-    mode_prefix: str,
+    normal_actions: list[dict],
+    mode_actions: list[dict],
     exception_normal_to_mode: dict[str, str],
-    unlinked_action_names: set[str],
+    unlinked_mode_names: set[str],
 ) -> dict[str, str]:
-    """モード側アクション名 -> 通常側アクション名 の対応を作る。"""
-    normal_names = {
-        action["name"]
-        for action in actions
-        if not _is_mode_action_name(action["name"])
+    """モード側id -> 通常側id の対応を、分離済みグループから作る。"""
+    normal_ids_by_name = {
+        action["name"]: action["id"]
+        for action in normal_actions
     }
-    mode_names = {
-        action["name"]
-        for action in actions
-        if action["name"].startswith(mode_prefix)
+    mode_ids_by_name = {
+        action["name"]: action["id"]
+        for action in mode_actions
     }
-
-    # 例外は「通常アクション名: モード側アクション名」で定義する。
-    resolved_exceptions = {
-        mode_name: normal_name
-        for normal_name, mode_name in exception_normal_to_mode.items()
-        if normal_name in normal_names and mode_name in mode_names
-    }
-    exception_normal_names = set(resolved_exceptions.values())
 
     links: dict[str, str] = {}
-    for mode_name in mode_names:
-        if mode_name in unlinked_action_names:
+    exception_mode_names = set(exception_normal_to_mode.values())
+
+    for mode_name, mode_id in mode_ids_by_name.items():
+        if mode_name in unlinked_mode_names:
             continue
+        normal_id = normal_ids_by_name.get(mode_name)
+        if normal_id is not None and mode_name not in exception_mode_names:
+            links[mode_id] = normal_id
 
-        suffix = mode_name.removeprefix(mode_prefix)
-        # 例外で同じ通常アクションの対応先が指定されている場合、
-        # 接尾辞一致の候補より例外側を優先する。
-        if suffix in normal_names and suffix not in exception_normal_names:
-            links[mode_name] = suffix
+    for normal_name, mode_name in exception_normal_to_mode.items():
+        normal_id = normal_ids_by_name.get(normal_name)
+        mode_id = mode_ids_by_name.get(mode_name)
+        if normal_id is not None and mode_id is not None:
+            links[mode_id] = normal_id
 
-    links.update(resolved_exceptions)
     return links
 
 
 CONTROLLER_PHOTO_MODE_LINKS = _build_mode_links(
-    ACTIONS,
-    PHOTO_MODE_PREFIX,
-    {
-    },
+    CONTROLLER_MAIN_ACTIONS,
+    CONTROLLER_PHOTO_MODE_ACTIONS,
+    {},
     CONTROLLER_PHOTO_MODE_UNLINKED_ACTION_NAMES,
 )
 
 KEYMOUSE_PHOTO_MODE_LINKS = _build_mode_links(
-    KEYMOUSE_ACTIONS,
-    PHOTO_MODE_PREFIX,
+    KEYMOUSE_MAIN_ACTIONS,
+    KEYMOUSE_PHOTO_MODE_ACTIONS,
     {
-        "カメラ-前": "撮影モードカメラパン-前",
-        "カメラ-後": "撮影モードカメラパン-後",
-        "カメラ-左": "撮影モードカメラパン-左",
-        "カメラ-右": "撮影モードカメラパン-右",
-        "ダッシュ/回避1": "撮影モードダッシュ/回避",
-        "撮影": "撮影モード撮影モード終了",
+        "カメラ-前": "カメラパン-前",
+        "カメラ-後": "カメラパン-後",
+        "カメラ-左": "カメラパン-左",
+        "カメラ-右": "カメラパン-右",
+        "ダッシュ/回避1": "ダッシュ/回避",
+        "撮影": "終了",
     },
     PHOTO_MODE_UNLINKED_ACTION_NAMES,
 )
 
-# 釣りモードは、先頭の「釣りモード」を除いた名前が通常アクション名と
-# 完全一致する場合だけ自動連動する。例外対応は不要。
+# 釣りモードは、分離済みグループ内の名前が通常側と完全一致する場合だけ自動連動する。
 CONTROLLER_FISHING_MODE_LINKS = _build_mode_links(
-    ACTIONS,
-    FISHING_MODE_PREFIX,
+    CONTROLLER_MAIN_ACTIONS,
+    CONTROLLER_FISHING_MODE_ACTIONS,
     {},
     CONTROLLER_FISHING_MODE_UNLINKED_ACTION_NAMES,
 )
 KEYMOUSE_FISHING_MODE_LINKS = _build_mode_links(
-    KEYMOUSE_ACTIONS,
-    FISHING_MODE_PREFIX,
+    KEYMOUSE_MAIN_ACTIONS,
+    KEYMOUSE_FISHING_MODE_ACTIONS,
     {},
     FISHING_MODE_UNLINKED_ACTION_NAMES,
 )
+
+# 「クイックホイールを閉じる」だけは、単独設定をオフにすると
+# 通常の「クイックホイール」設定へ追従する。
+CONTROLLER_QUICK_WHEEL_LINKS = {
+    _make_action_id(ACTION_GROUP_QUICK_WHEEL, "クイックホイールを閉じる"):
+        _make_action_id(ACTION_GROUP_MAIN, "クイックホイール"),
+}
+KEYMOUSE_QUICK_WHEEL_LINKS = {
+    _make_action_id(ACTION_GROUP_QUICK_WHEEL, "クイックホイールを閉じる"):
+        _make_action_id(ACTION_GROUP_MAIN, "クイックホイール"),
+}
 
 
 class SaveEditorApp:
@@ -792,15 +850,6 @@ class SaveEditorApp:
         self.keymouse_action_control_widgets: dict[str, list[ttk.Combobox]] = {}
         self._keymouse_custom_records: dict[str, tuple[int, int]] = {}
 
-        self.controller_actions_by_name = {
-            action["name"]: action
-            for action in ACTIONS
-        }
-        self.keymouse_actions_by_name = {
-            action["name"]: action
-            for action in KEYMOUSE_ACTIONS
-        }
-
         self.path_var = tk.StringVar()
         self.detected_save_var = tk.StringVar()
         self.detected_saves: list[tuple[str, Path]] = []
@@ -812,6 +861,8 @@ class SaveEditorApp:
         self.helper2_var = tk.StringVar()
         self.controller_var = tk.StringVar(value=DEFAULT_CONTROLLER)
         self.keymouse_mode_var = tk.BooleanVar(value=False)
+        self.controller_quick_wheel_independent_var = tk.BooleanVar(value=False)
+        self.keymouse_quick_wheel_independent_var = tk.BooleanVar(value=False)
         self.controller_photo_mode_independent_var = tk.BooleanVar(value=False)
         self.keymouse_photo_mode_independent_var = tk.BooleanVar(value=False)
         self.keymouse_fishing_mode_independent_var = tk.BooleanVar(value=False)
@@ -826,15 +877,21 @@ class SaveEditorApp:
         self.path_entry: Optional[ttk.Entry] = None
         self.rescan_button: Optional[ttk.Button] = None
         self.manual_select_button: Optional[ttk.Button] = None
+        self.open_selected_file_location_button: Optional[ttk.Button] = None
         self.button_layout_load_button: Optional[ttk.Button] = None
+        self.open_button_layout_location_button: Optional[ttk.Button] = None
+        self.controller_quick_wheel_checkbutton: Optional[ttk.Checkbutton] = None
+        self.keymouse_quick_wheel_checkbutton: Optional[ttk.Checkbutton] = None
         self.controller_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_fishing_mode_checkbutton: Optional[ttk.Checkbutton] = None
 
         self.keybind_group: Optional[ttk.LabelFrame] = None
         self.controller_action_group: Optional[ttk.LabelFrame] = None
+        self.controller_quick_wheel_action_group: Optional[ttk.LabelFrame] = None
         self.controller_photo_action_group: Optional[ttk.LabelFrame] = None
         self.keymouse_action_group: Optional[ttk.LabelFrame] = None
+        self.keymouse_quick_wheel_action_group: Optional[ttk.LabelFrame] = None
         self.keymouse_photo_action_group: Optional[ttk.LabelFrame] = None
         self.controller_fishing_action_group: Optional[ttk.LabelFrame] = None
         self.keymouse_fishing_action_group: Optional[ttk.LabelFrame] = None
@@ -843,6 +900,12 @@ class SaveEditorApp:
         self.save_button: Optional[ttk.Button] = None
 
         self._suspend_events = False
+        # JSONを読み込んだときは、両方のプロフィールを保持する。
+        # 表示していない側へ切り替えた時は、このキャッシュを適用する。
+        self._layout_profile_cache: dict[str, Optional[dict]] = {
+            "controller": None,
+            "keymouse": None,
+        }
         self._last_controller_type = DEFAULT_CONTROLLER
         self._last_helper1_display = ""
         self._last_helper2_display = ""
@@ -890,11 +953,17 @@ class SaveEditorApp:
         self._suspend_events = True
         try:
             if isinstance(controller_profile, dict):
+                self.controller_quick_wheel_independent_var.set(
+                    controller_profile.get("quick_wheel_independent") is True
+                )
                 self.controller_photo_mode_independent_var.set(
                     controller_profile.get("photo_mode_independent") is True
                 )
 
             if isinstance(keymouse_profile, dict):
+                self.keymouse_quick_wheel_independent_var.set(
+                    keymouse_profile.get("quick_wheel_independent") is True
+                )
                 self.keymouse_photo_mode_independent_var.set(
                     keymouse_profile.get("photo_mode_independent") is True
                 )
@@ -928,6 +997,9 @@ class SaveEditorApp:
     def _collect_controller_layout_profile(self) -> dict:
         return {
             "controller_type": self._get_current_controller_type(),
+            "quick_wheel_independent": bool(
+                self.controller_quick_wheel_independent_var.get()
+            ),
             "photo_mode_independent": bool(
                 self.controller_photo_mode_independent_var.get()
             ),
@@ -937,17 +1009,20 @@ class SaveEditorApp:
                 "preset": self.preset_var.get(),
             },
             "actions": {
-                action["name"]: {
-                    "helper": self.action_helper_vars[action["name"]].get(),
-                    "button": self.combo_vars[action["name"]].get(),
+                action["id"]: {
+                    "helper": self.action_helper_vars[action["id"]].get(),
+                    "button": self.combo_vars[action["id"]].get(),
                 }
                 for action in ACTIONS
-                if action["name"] in self.combo_vars
+                if action["id"] in self.combo_vars
             },
         }
 
     def _collect_keymouse_layout_profile(self) -> dict:
         return {
+            "quick_wheel_independent": bool(
+                self.keymouse_quick_wheel_independent_var.get()
+            ),
             "photo_mode_independent": bool(
                 self.keymouse_photo_mode_independent_var.get()
             ),
@@ -955,24 +1030,275 @@ class SaveEditorApp:
                 self.keymouse_fishing_mode_independent_var.get()
             ),
             "actions": {
-                action["name"]: {
-                    "key": self.keymouse_combo_vars[action["name"]].get(),
+                action["id"]: {
+                    "key": self.keymouse_combo_vars[action["id"]].get(),
                 }
                 for action in KEYMOUSE_ACTIONS
-                if action["name"] in self.keymouse_combo_vars
+                if action["id"] in self.keymouse_combo_vars
             },
         }
 
+    def _normalize_controller_layout_profile(self, profile: dict) -> dict:
+        """単独設定オフの連動値を反映したゲームパッドプロフィールを返す。"""
+        if not isinstance(profile, dict):
+            profile = {}
+
+        normalized = copy.deepcopy(profile)
+        controller_type = normalized.get("controller_type")
+        if controller_type not in CONTROLLER_OPTIONS:
+            controller_type = DEFAULT_CONTROLLER
+        normalized["controller_type"] = controller_type
+        normalized["quick_wheel_independent"] = bool(
+            normalized.get("quick_wheel_independent", False)
+        )
+        normalized["photo_mode_independent"] = bool(
+            normalized.get("photo_mode_independent", False)
+        )
+
+        keybind = normalized.get("keybind")
+        if not isinstance(keybind, dict):
+            keybind = {}
+        normalized["keybind"] = keybind
+
+        actions = normalized.get("actions")
+        if not isinstance(actions, dict):
+            actions = {}
+        normalized["actions"] = actions
+
+        self._normalize_controller_link_group_profile(
+            actions,
+            CONTROLLER_QUICK_WHEEL_ACTIONS,
+            CONTROLLER_QUICK_WHEEL_LINKS,
+            normalized["quick_wheel_independent"],
+        )
+        self._normalize_controller_link_group_profile(
+            actions,
+            CONTROLLER_PHOTO_MODE_ACTIONS,
+            CONTROLLER_PHOTO_MODE_LINKS,
+            normalized["photo_mode_independent"],
+        )
+        # コントローラの釣りモードは常に個別設定のため連動しない。
+        return normalized
+
+    def _normalize_keymouse_layout_profile(self, profile: dict) -> dict:
+        """単独設定オフの連動値を反映したキーマウプロフィールを返す。"""
+        if not isinstance(profile, dict):
+            profile = {}
+
+        normalized = copy.deepcopy(profile)
+        normalized["quick_wheel_independent"] = bool(
+            normalized.get("quick_wheel_independent", False)
+        )
+        normalized["photo_mode_independent"] = bool(
+            normalized.get("photo_mode_independent", False)
+        )
+        normalized["fishing_mode_independent"] = bool(
+            normalized.get("fishing_mode_independent", False)
+        )
+
+        actions = normalized.get("actions")
+        if not isinstance(actions, dict):
+            actions = {}
+        normalized["actions"] = actions
+
+        self._normalize_keymouse_link_group_profile(
+            actions,
+            KEYMOUSE_QUICK_WHEEL_ACTIONS,
+            KEYMOUSE_QUICK_WHEEL_LINKS,
+            normalized["quick_wheel_independent"],
+        )
+        self._normalize_keymouse_link_group_profile(
+            actions,
+            KEYMOUSE_PHOTO_MODE_ACTIONS,
+            KEYMOUSE_PHOTO_MODE_LINKS,
+            normalized["photo_mode_independent"],
+        )
+        self._normalize_keymouse_link_group_profile(
+            actions,
+            KEYMOUSE_FISHING_MODE_ACTIONS,
+            KEYMOUSE_FISHING_MODE_LINKS,
+            normalized["fishing_mode_independent"],
+        )
+        return normalized
+
+    def _normalize_controller_link_group_profile(
+        self,
+        profile_actions: dict,
+        mode_actions: list[dict],
+        mode_links: dict[str, str],
+        independent: bool,
+    ):
+        """単独設定オフ時のゲームパッド連動をプロフィール内で確定する。"""
+        if independent:
+            return
+
+        for action in mode_actions:
+            mode_id = action["id"]
+            source_id = mode_links.get(mode_id)
+            if source_id is None:
+                continue
+
+            source = profile_actions.get(source_id)
+            if not isinstance(source, dict):
+                continue
+
+            target = profile_actions.get(mode_id)
+            if not isinstance(target, dict):
+                target = {}
+                profile_actions[mode_id] = target
+
+            if "button" in source:
+                target["button"] = source["button"]
+            if self._controller_action_uses_helper(action) and "helper" in source:
+                target["helper"] = source["helper"]
+
+    def _normalize_keymouse_link_group_profile(
+        self,
+        profile_actions: dict,
+        mode_actions: list[dict],
+        mode_links: dict[str, str],
+        independent: bool,
+    ):
+        """単独設定オフ時のキーマウ連動をプロフィール内で確定する。"""
+        if independent:
+            return
+
+        for action in mode_actions:
+            mode_id = action["id"]
+            source_id = mode_links.get(mode_id)
+            if source_id is None:
+                continue
+
+            source = profile_actions.get(source_id)
+            if not isinstance(source, dict):
+                continue
+
+            target = profile_actions.get(mode_id)
+            if not isinstance(target, dict):
+                target = {}
+                profile_actions[mode_id] = target
+
+            if "key" in source:
+                target["key"] = source["key"]
+
+    def _merge_controller_layout_profile(
+        self,
+        base_profile: Optional[dict],
+        overlay_profile: dict,
+    ) -> dict:
+        """bytes基準の完全プロフィールへJSONの指定済み値だけを上書きする。"""
+        result = copy.deepcopy(base_profile) if isinstance(base_profile, dict) else {}
+        if not isinstance(overlay_profile, dict):
+            return self._normalize_controller_layout_profile(result)
+
+        for key in (
+            "controller_type",
+            "quick_wheel_independent",
+            "photo_mode_independent",
+        ):
+            if key in overlay_profile:
+                result[key] = copy.deepcopy(overlay_profile[key])
+
+        overlay_keybind = overlay_profile.get("keybind")
+        if isinstance(overlay_keybind, dict):
+            result_keybind = result.setdefault("keybind", {})
+            if not isinstance(result_keybind, dict):
+                result_keybind = {}
+                result["keybind"] = result_keybind
+            for key in ("helper1", "helper2", "preset"):
+                if key in overlay_keybind:
+                    result_keybind[key] = copy.deepcopy(overlay_keybind[key])
+
+        overlay_actions = overlay_profile.get("actions")
+        if isinstance(overlay_actions, dict):
+            result_actions = result.setdefault("actions", {})
+            if not isinstance(result_actions, dict):
+                result_actions = {}
+                result["actions"] = result_actions
+            for action in ACTIONS:
+                action_id = action["id"]
+                overlay_action = _get_profile_action_entry(overlay_actions, action)
+                if not isinstance(overlay_action, dict):
+                    continue
+                result_action = result_actions.setdefault(action_id, {})
+                if not isinstance(result_action, dict):
+                    result_action = {}
+                    result_actions[action_id] = result_action
+                for key in ("helper", "button"):
+                    if key in overlay_action:
+                        result_action[key] = copy.deepcopy(overlay_action[key])
+
+        return self._normalize_controller_layout_profile(result)
+
+    def _merge_keymouse_layout_profile(
+        self,
+        base_profile: Optional[dict],
+        overlay_profile: dict,
+    ) -> dict:
+        """bytes基準の完全プロフィールへJSONの指定済み値だけを上書きする。"""
+        result = copy.deepcopy(base_profile) if isinstance(base_profile, dict) else {}
+        if not isinstance(overlay_profile, dict):
+            return self._normalize_keymouse_layout_profile(result)
+
+        for key in (
+            "quick_wheel_independent",
+            "photo_mode_independent",
+            "fishing_mode_independent",
+        ):
+            if key in overlay_profile:
+                result[key] = copy.deepcopy(overlay_profile[key])
+
+        overlay_actions = overlay_profile.get("actions")
+        if isinstance(overlay_actions, dict):
+            result_actions = result.setdefault("actions", {})
+            if not isinstance(result_actions, dict):
+                result_actions = {}
+                result["actions"] = result_actions
+            for action in KEYMOUSE_ACTIONS:
+                action_id = action["id"]
+                overlay_action = _get_profile_action_entry(overlay_actions, action)
+                if not isinstance(overlay_action, dict):
+                    continue
+                result_action = result_actions.setdefault(action_id, {})
+                if not isinstance(result_action, dict):
+                    result_action = {}
+                    result_actions[action_id] = result_action
+                if "key" in overlay_action:
+                    result_action["key"] = copy.deepcopy(overlay_action["key"])
+
+        return self._normalize_keymouse_layout_profile(result)
+
+    def _initialize_layout_profile_cache_from_ui(self):
+        """bytes読込・リセット後、両UIから両プロフィールキャッシュを作り直す。"""
+        self._layout_profile_cache["controller"] = (
+            self._normalize_controller_layout_profile(
+                self._collect_controller_layout_profile()
+            )
+        )
+        self._layout_profile_cache["keymouse"] = (
+            self._normalize_keymouse_layout_profile(
+                self._collect_keymouse_layout_profile()
+            )
+        )
+
+    def _get_cached_layout_profile(self, profile_name: str) -> dict:
+        profile = self._layout_profile_cache.get(profile_name)
+        if not isinstance(profile, dict):
+            raise ValueError("保存するキー設定が初期化されていません。")
+        return copy.deepcopy(profile)
+
     def _collect_button_layout(self) -> dict:
+        # 保存直前にも現在UIをキャッシュへ反映する。JSON本文は両キャッシュだけから作る。
+        self._cache_current_active_layout_profile()
         return {
-            "version": 4,
+            "version": 6,
             "input_device": self._get_selected_input_device(),
-            "controller_profile": self._collect_controller_layout_profile(),
-            "keymouse_profile": self._collect_keymouse_layout_profile(),
+            "controller_profile": self._get_cached_layout_profile("controller"),
+            "keymouse_profile": self._get_cached_layout_profile("keymouse"),
         }
 
     def _write_button_layout_file(self) -> Path:
-        """現在のUI上のキー設定をJSONへ保存し、保存先を返す。"""
+        """両プロフィールキャッシュをJSONへ保存し、保存先を返す。"""
         path = self.get_button_layout_path()
         data = self._collect_button_layout()
         path.write_text(
@@ -981,17 +1307,74 @@ class SaveEditorApp:
         )
         return path
 
+    def _cache_current_active_layout_profile(self):
+        """現在表示中UIを、対応するプロフィールキャッシュへ即時反映する。"""
+        if self._is_keymouse_mode():
+            self._layout_profile_cache["keymouse"] = (
+                self._normalize_keymouse_layout_profile(
+                    self._collect_keymouse_layout_profile()
+                )
+            )
+        else:
+            self._layout_profile_cache["controller"] = (
+                self._normalize_controller_layout_profile(
+                    self._collect_controller_layout_profile()
+                )
+            )
+
+    def _cache_loaded_layout_profiles(
+        self,
+        controller_profile: dict,
+        keymouse_profile: dict,
+    ):
+        """JSONを両プロフィールキャッシュへ読み込み、欠損項目はbytes基準で補う。"""
+        self._layout_profile_cache["controller"] = (
+            self._merge_controller_layout_profile(
+                self._layout_profile_cache.get("controller"),
+                controller_profile,
+            )
+        )
+        self._layout_profile_cache["keymouse"] = (
+            self._merge_keymouse_layout_profile(
+                self._layout_profile_cache.get("keymouse"),
+                keymouse_profile,
+            )
+        )
+
+    def _apply_cached_layout_for_current_input(self):
+        """現在選択中の入力方式に対応するキャッシュ済みプロフィールだけをUIへ反映する。"""
+        if self._is_keymouse_mode():
+            self._apply_keymouse_layout_profile(
+                self._get_cached_layout_profile("keymouse")
+            )
+            return
+
+        profile = self._get_cached_layout_profile("controller")
+        controller_type = profile.get("controller_type")
+        if controller_type not in CONTROLLER_OPTIONS:
+            controller_type = DEFAULT_CONTROLLER
+        self._apply_controller_layout_profile(profile, controller_type)
+
     def _apply_controller_layout_profile(self, profile: dict, controller_type: str):
         if controller_type not in CONTROLLER_OPTIONS:
             controller_type = DEFAULT_CONTROLLER
-
-        self.controller_var.set(controller_type)
-        self._refresh_controller_dependent_labels()
 
         keybind = profile.get("keybind") or {}
         actions = profile.get("actions") or {}
         if not isinstance(keybind, dict) or not isinstance(actions, dict):
             raise ValueError("ゲームパッド配置の形式が不正です。")
+
+        # 単独設定状態を先に反映する。以後の同期では、チェックが外れている
+        # 対象だけ通常側へ一致させ、単独設定の値はそのまま維持する。
+        self.controller_quick_wheel_independent_var.set(
+            bool(profile.get("quick_wheel_independent", False))
+        )
+        self.controller_photo_mode_independent_var.set(
+            bool(profile.get("photo_mode_independent", False))
+        )
+
+        self.controller_var.set(controller_type)
+        self._refresh_controller_dependent_labels()
 
         helper_values = list(self._get_helper_value_to_label().values())
         preset_values = [label for _, label in self._get_current_preset_options()]
@@ -1014,30 +1397,26 @@ class SaveEditorApp:
         valid_helper_labels = set(self._get_action_helper_display_values())
 
         for action in ACTIONS:
-            name = action["name"]
-            saved = actions.get(name)
+            action_id = action["id"]
+            saved = _get_profile_action_entry(actions, action)
             if not isinstance(saved, dict):
                 continue
 
             if self._controller_action_uses_helper(action):
                 helper_label = saved.get("helper")
                 if helper_label in valid_helper_labels:
-                    self.action_helper_vars[name].set(helper_label)
+                    self.action_helper_vars[action_id].set(helper_label)
 
             button_label = saved.get("button")
             if button_label in valid_button_labels:
                 self._append_combo_value_if_missing(
-                    self.comboboxes.get(name),
+                    self.comboboxes.get(action_id),
                     button_label,
                 )
-                self.combo_vars[name].set(button_label)
+                self.combo_vars[action_id].set(button_label)
 
-        self.controller_photo_mode_independent_var.set(
-            bool(profile.get("photo_mode_independent", False))
-        )
         self._refresh_action_combobox_choices()
         self._refresh_action_helper_combobox_choices()
-        self._update_mode_linking()
         self._update_preset_editability()
 
     def _apply_keymouse_layout_profile(self, profile: dict):
@@ -1045,26 +1424,30 @@ class SaveEditorApp:
         if not isinstance(actions, dict):
             raise ValueError("キーボード/マウス配置の形式が不正です。")
 
-        for action in KEYMOUSE_ACTIONS:
-            name = action["name"]
-            saved = actions.get(name)
-            if not isinstance(saved, dict):
-                continue
-
-            key_label = saved.get("key")
-            if key_label in KEYMOUSE_LABEL_TO_RECORD:
-                self.keymouse_combo_vars[name].set(key_label)
-
+        # 単独設定状態を先に反映する。チェックが外れている対象は、
+        # 反映完了後に通常側へ同期される。
+        self.keymouse_quick_wheel_independent_var.set(
+            bool(profile.get("quick_wheel_independent", False))
+        )
         self.keymouse_photo_mode_independent_var.set(
             bool(profile.get("photo_mode_independent", False))
         )
         self.keymouse_fishing_mode_independent_var.set(
             bool(profile.get("fishing_mode_independent", False))
         )
-        self._update_mode_linking()
+
+        for action in KEYMOUSE_ACTIONS:
+            action_id = action["id"]
+            saved = _get_profile_action_entry(actions, action)
+            if not isinstance(saved, dict):
+                continue
+
+            key_label = saved.get("key")
+            if key_label in KEYMOUSE_LABEL_TO_RECORD:
+                self.keymouse_combo_vars[action_id].set(key_label)
 
     def load_button_layout(self):
-        """JSONからUI上の配置だけを読み込む。localsave.bytesには書かない。"""
+        """JSONから配置を読み、選択されている入力方式だけを画面へ反映する。"""
         path = self.get_button_layout_path()
         if not path.exists():
             messagebox.showerror("配置読み込みエラー", f"配置ファイルが見つかりません。\n{path}")
@@ -1079,7 +1462,6 @@ class SaveEditorApp:
             if "controller_profile" in data:
                 controller_profile = data.get("controller_profile") or {}
                 keymouse_profile = data.get("keymouse_profile") or {}
-                input_device = data.get("input_device") or DEFAULT_CONTROLLER
                 controller_type = controller_profile.get("controller_type") or DEFAULT_CONTROLLER
             else:
                 legacy_controller = data.get("controller")
@@ -1094,25 +1476,34 @@ class SaveEditorApp:
                     "actions": data.get("actions") or {},
                 }
                 keymouse_profile = {}
-                input_device = controller_type
 
             if not isinstance(controller_profile, dict) or not isinstance(keymouse_profile, dict):
                 raise ValueError("配置ファイルの形式が不正です。")
 
             if controller_type not in CONTROLLER_OPTIONS:
                 controller_type = DEFAULT_CONTROLLER
-            if input_device not in SAVED_INPUT_DEVICE_OPTIONS:
-                input_device = controller_type
+                controller_profile = {
+                    **controller_profile,
+                    "controller_type": controller_type,
+                }
 
+            # JSONの両プロフィールを先にキャッシュする。読み込み時の入力方式は
+            # JSONの input_device では変更せず、現在表示中の入力方式を維持する。
+            self._cache_loaded_layout_profiles(
+                controller_profile,
+                keymouse_profile,
+            )
+
+            previous_suspend = self._suspend_events
             self._suspend_events = True
             try:
-                self._apply_controller_layout_profile(controller_profile, controller_type)
-                self._apply_keymouse_layout_profile(keymouse_profile)
-                self.keymouse_mode_var.set(input_device == KEYMOUSE_DEVICE)
+                self._apply_cached_layout_for_current_input()
                 self._update_input_mode_ui()
+                self._update_mode_linking()
             finally:
-                self._suspend_events = False
+                self._suspend_events = previous_suspend
 
+            self._cache_current_active_layout_profile()
             self.base_status_message = f"キー設定を読み込みました: {path.name}"
             self.update_save_button_state()
             messagebox.showinfo(
@@ -1174,15 +1565,6 @@ class SaveEditorApp:
         file_group.columnconfigure(0, weight=1)
         row += 1
 
-        detected_group = ttk.LabelFrame(
-            self.content,
-            text="検出された設定ファイル",
-            padding=8,
-        )
-        detected_group.grid(row=row, column=0, sticky="ew", pady=(0, 8))
-        detected_group.columnconfigure(0, weight=1)
-        row += 1
-
         layout_group = ttk.LabelFrame(
             self.content,
             text="キー設定プリセット",
@@ -1237,6 +1619,35 @@ class SaveEditorApp:
         )
         self.keymouse_action_group.columnconfigure(0, weight=1)
         self.keymouse_action_group.grid_remove()
+        row += 1
+
+        quick_wheel_action_group_row = row
+        self.controller_quick_wheel_action_group = ttk.LabelFrame(
+            self.content,
+            text="クイックホイールのキー設定",
+            padding=8,
+        )
+        self.controller_quick_wheel_action_group.grid(
+            row=quick_wheel_action_group_row,
+            column=0,
+            sticky="ew",
+            pady=(0, 8),
+        )
+        self.controller_quick_wheel_action_group.columnconfigure(0, weight=1)
+
+        self.keymouse_quick_wheel_action_group = ttk.LabelFrame(
+            self.content,
+            text="クイックホイールのキー設定",
+            padding=8,
+        )
+        self.keymouse_quick_wheel_action_group.grid(
+            row=quick_wheel_action_group_row,
+            column=0,
+            sticky="ew",
+            pady=(0, 8),
+        )
+        self.keymouse_quick_wheel_action_group.columnconfigure(0, weight=1)
+        self.keymouse_quick_wheel_action_group.grid_remove()
         row += 1
 
         photo_action_group_row = row
@@ -1297,33 +1708,9 @@ class SaveEditorApp:
         self.keymouse_fishing_action_group.grid_remove()
         row += 1
 
-        # ファイル選択
-        file_row = ttk.Frame(file_group)
-        file_row.grid(row=0, column=0, sticky="ew")
-        file_row.columnconfigure(0, weight=1)
-
-        self.path_entry = ttk.Entry(file_row, textvariable=self.path_var)
-        self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
-
-        self.manual_select_button = ttk.Button(
-            file_row,
-            text="手動選択",
-            command=self.select_file,
-        )
-        self.manual_select_button.grid(row=0, column=1, sticky="e")
-
-        ttk.Label(
-            file_group,
-            text=(
-                "キー設定の設定ファイルは通常、次の場所にあります。\n"
-                "%USERPROFILE%\\AppData\\LocalLow\\bokura\\[アジア版やSteam版などのフォルダ]\\ \n"
-                "localsave\\Env1\\[数字のフォルダ]\\[キャラクターUIDのフォルダ]\\localsave.bytes (2 KB以上)"
-            ),
-            justify="left",
-        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
-
-        # 検出された設定ファイル
-        detected_row = ttk.Frame(detected_group)
+        # 設定ファイル選択
+        # 1行目は検出済み設定ファイルを直接選ぶ行にする。
+        detected_row = ttk.Frame(file_group)
         detected_row.grid(row=0, column=0, sticky="ew")
         detected_row.columnconfigure(0, weight=1)
 
@@ -1351,6 +1738,39 @@ class SaveEditorApp:
             command=self.rescan_detected_saves,
         )
         self.rescan_button.grid(row=0, column=1, sticky="e")
+
+        # 以前のファイル選択行は2行目へ移動する。
+        file_row = ttk.Frame(file_group)
+        file_row.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        file_row.columnconfigure(0, weight=1)
+
+        self.path_entry = ttk.Entry(file_row, textvariable=self.path_var)
+        self.path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
+
+        self.manual_select_button = ttk.Button(
+            file_row,
+            text="手動選択",
+            command=self.select_file,
+        )
+        self.manual_select_button.grid(row=0, column=1, sticky="e", padx=(0, 6))
+
+        self.open_selected_file_location_button = ttk.Button(
+            file_row,
+            text="場所を開く",
+            command=self.open_selected_file_location,
+            state="disabled",
+        )
+        self.open_selected_file_location_button.grid(row=0, column=2, sticky="e")
+
+        ttk.Label(
+            file_group,
+            text=(
+                "キー設定の設定ファイルは通常、次の場所にあります。\n"
+                "%USERPROFILE%\\AppData\\LocalLow\\bokura\\[アジア版やSteam版などのフォルダ]\\ \n"
+                "localsave\\Env1\\[数字のフォルダ]\\[キャラクターUIDのフォルダ]\\localsave.bytes (2 KB以上)"
+            ),
+            justify="left",
+        ).grid(row=2, column=0, sticky="w", pady=(8, 0))
 
         # 入力デバイス
         input_mode_button_row = ttk.Frame(input_device_group)
@@ -1417,6 +1837,18 @@ class SaveEditorApp:
             row=0,
             column=1,
             sticky="e",
+            padx=(0, 6),
+        )
+
+        self.open_button_layout_location_button = ttk.Button(
+            layout_row,
+            text="場所を開く",
+            command=self.open_button_layout_location,
+        )
+        self.open_button_layout_location_button.grid(
+            row=0,
+            column=2,
+            sticky="e",
         )
 
         # ゲームパッドの補助キー・確認/キャンセル
@@ -1468,6 +1900,51 @@ class SaveEditorApp:
                 action,
             )
 
+        # クイックホイールのアクション一覧
+        self.controller_quick_wheel_checkbutton = ttk.Checkbutton(
+            self.controller_quick_wheel_action_group,
+            text="クイックホイールのアクションを単独で設定する",
+            variable=self.controller_quick_wheel_independent_var,
+        )
+        self.controller_quick_wheel_checkbutton.grid(
+            row=0,
+            column=0,
+            sticky="w",
+            pady=(0, 8),
+        )
+
+        for action_row, action in enumerate(
+            CONTROLLER_QUICK_WHEEL_ACTIONS,
+            start=1,
+        ):
+            self._add_action_row(
+                self.controller_quick_wheel_action_group,
+                action_row,
+                action,
+            )
+
+        self.keymouse_quick_wheel_checkbutton = ttk.Checkbutton(
+            self.keymouse_quick_wheel_action_group,
+            text="クイックホイールのアクションを単独で設定する",
+            variable=self.keymouse_quick_wheel_independent_var,
+        )
+        self.keymouse_quick_wheel_checkbutton.grid(
+            row=0,
+            column=0,
+            sticky="w",
+            pady=(0, 8),
+        )
+
+        for action_row, action in enumerate(
+            KEYMOUSE_QUICK_WHEEL_ACTIONS,
+            start=1,
+        ):
+            self._add_keymouse_action_row(
+                self.keymouse_quick_wheel_action_group,
+                action_row,
+                action,
+            )
+
         # 撮影モードのアクション一覧
         self.controller_photo_mode_checkbutton = ttk.Checkbutton(
             self.controller_photo_action_group,
@@ -1489,7 +1966,6 @@ class SaveEditorApp:
                 self.controller_photo_action_group,
                 action_row,
                 action,
-                display_name=action["name"].removeprefix(PHOTO_MODE_PREFIX),
             )
 
         self.keymouse_photo_mode_checkbutton = ttk.Checkbutton(
@@ -1512,7 +1988,6 @@ class SaveEditorApp:
                 self.keymouse_photo_action_group,
                 action_row,
                 action,
-                display_name=action["name"].removeprefix(PHOTO_MODE_PREFIX),
             )
 
         # 釣りモードのアクション一覧
@@ -1523,7 +1998,6 @@ class SaveEditorApp:
                 self.controller_fishing_action_group,
                 action_row,
                 action,
-                display_name=action["name"].removeprefix(FISHING_MODE_PREFIX),
             )
 
         self.keymouse_fishing_mode_checkbutton = ttk.Checkbutton(
@@ -1546,7 +2020,6 @@ class SaveEditorApp:
                 self.keymouse_fishing_action_group,
                 action_row,
                 action,
-                display_name=action["name"].removeprefix(FISHING_MODE_PREFIX),
             )
 
         # フッター（固定）
@@ -1633,20 +2106,6 @@ class SaveEditorApp:
         if self._dropdown_watch_job is not None:
             self.root.after_cancel(self._dropdown_watch_job)
             self._dropdown_watch_job = None
-    
-    def _on_combobox_focusout(self, combo: ttk.Combobox):
-        # ドロップダウンリスト側へフォーカスが移るだけのことがあるので、
-        # その場では閉じた扱いにせず、アイドル時に実際の表示状態を確認する
-        self.root.after_idle(lambda c=combo: self._close_combobox_if_popdown_hidden(c))
-
-    def _close_combobox_if_popdown_hidden(self, combo: ttk.Combobox):
-        try:
-            popdown = self.root.tk.call("ttk::combobox::PopdownWindow", str(combo))
-            is_mapped = self.root.tk.call("winfo", "ismapped", popdown)
-            if is_mapped != 1:
-                self._combobox_dropdown_open = False
-        except tk.TclError:
-            self._combobox_dropdown_open = False
 
     def _on_combobox_mousewheel(self, event):
         if self._combobox_dropdown_open:
@@ -1656,26 +2115,6 @@ class SaveEditorApp:
             return "break"
 
         self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        return "break"
-
-    def _on_combobox_mousewheel_linux_up(self, event):
-        if self._combobox_dropdown_open:
-            return "break"
-
-        if not self._can_scroll_vertical():
-            return "break"
-
-        self.canvas.yview_scroll(-1, "units")
-        return "break"
-
-    def _on_combobox_mousewheel_linux_down(self, event):
-        if self._combobox_dropdown_open:
-            return "break"
-
-        if not self._can_scroll_vertical():
-            return "break"
-
-        self.canvas.yview_scroll(1, "units")
         return "break"
 
     def _add_top_combo_row(
@@ -1711,20 +2150,16 @@ class SaveEditorApp:
         parent: ttk.Frame,
         row: int,
         action: dict,
-        display_name: Optional[str] = None,
     ):
         """ゲームパッド用のアクション行を追加する。"""
         frame = ttk.Frame(parent)
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 4))
         frame.columnconfigure(0, weight=1)
 
-        action_name = action["name"]
+        action_id = action["id"]
         uses_helper_ui = self._controller_action_uses_helper(action)
 
-        ttk.Label(
-            frame,
-            text=display_name if display_name is not None else action_name,
-        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text=action["name"]).grid(row=0, column=0, sticky="w")
 
         helper_var = tk.StringVar(value=ACTION_HELPER_NONE_LABEL)
         var = tk.StringVar()
@@ -1759,7 +2194,7 @@ class SaveEditorApp:
             combo.grid(row=0, column=3, sticky="e")
 
             self._register_combobox_bindings(helper_combo)
-            self.action_helper_combos[action_name] = helper_combo
+            self.action_helper_combos[action_id] = helper_combo
             controls.append(helper_combo)
         else:
             combo = ttk.Combobox(
@@ -1775,10 +2210,10 @@ class SaveEditorApp:
         self._register_combobox_bindings(combo)
         controls.append(combo)
 
-        self.action_helper_vars[action_name] = helper_var
-        self.combo_vars[action_name] = var
-        self.comboboxes[action_name] = combo
-        self.controller_action_control_widgets[action_name] = controls
+        self.action_helper_vars[action_id] = helper_var
+        self.combo_vars[action_id] = var
+        self.comboboxes[action_id] = combo
+        self.controller_action_control_widgets[action_id] = controls
 
     def _get_keymouse_action_display_values(self, action: dict) -> list[str]:
         allowed_input_types = action.get("allowed_input_types")
@@ -1797,22 +2232,18 @@ class SaveEditorApp:
         parent: ttk.Frame,
         row: int,
         action: dict,
-        display_name: Optional[str] = None,
     ):
         """キーボード/マウス用のアクション行を追加する。補助キーUIは持たない。"""
         frame = ttk.Frame(parent)
         frame.grid(row=row, column=0, sticky="ew", pady=(0, 4))
         frame.columnconfigure(0, weight=1)
 
-        action_name = action["name"]
-        ttk.Label(
-            frame,
-            text=display_name if display_name is not None else action_name,
-        ).grid(row=0, column=0, sticky="w")
+        action_id = action["id"]
+        ttk.Label(frame, text=action["name"]).grid(row=0, column=0, sticky="w")
 
         var = tk.StringVar()
         combo_column = 1
-        if action_name in KEYMOUSE_LCTRL_PREFIX_ACTION_NAMES:
+        if action_id in KEYMOUSE_LCTRL_PREFIX_ACTION_IDS:
             ttk.Label(frame, text="L Ctrl +").grid(
                 row=0,
                 column=1,
@@ -1832,26 +2263,35 @@ class SaveEditorApp:
         combo.grid(row=0, column=combo_column, sticky="e")
 
         self._register_combobox_bindings(combo)
-        self.keymouse_combo_vars[action_name] = var
-        self.keymouse_comboboxes[action_name] = combo
-        self.keymouse_action_control_widgets[action_name] = [combo]
+        self.keymouse_combo_vars[action_id] = var
+        self.keymouse_comboboxes[action_id] = combo
+        self.keymouse_action_control_widgets[action_id] = [combo]
 
     def _bind_traces(self):
         self.controller_var.trace_add("write", self._on_controller_changed)
         self.preset_var.trace_add("write", self._on_any_value_changed)
         self.helper1_var.trace_add("write", self._on_helper1_changed)
         self.helper2_var.trace_add("write", self._on_helper2_changed)
+
+        self.controller_quick_wheel_independent_var.trace_add(
+            "write",
+            self._on_controller_quick_wheel_independent_changed,
+        )
+        self.keymouse_quick_wheel_independent_var.trace_add(
+            "write",
+            self._on_keymouse_quick_wheel_independent_changed,
+        )
         self.controller_photo_mode_independent_var.trace_add(
             "write",
-            self._on_any_value_changed,
+            self._on_controller_photo_mode_independent_changed,
         )
         self.keymouse_photo_mode_independent_var.trace_add(
             "write",
-            self._on_any_value_changed,
+            self._on_keymouse_photo_mode_independent_changed,
         )
         self.keymouse_fishing_mode_independent_var.trace_add(
             "write",
-            self._on_any_value_changed,
+            self._on_keymouse_fishing_mode_independent_changed,
         )
 
         for var in self.combo_vars.values():
@@ -1900,7 +2340,7 @@ class SaveEditorApp:
         self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
         self.canvas.bind_all("<Button-4>", _on_mousewheel_linux_up)
         self.canvas.bind_all("<Button-5>", _on_mousewheel_linux_down)
-    
+
     def _bind_clear_selection_click(self):
         self.root.bind_all("<Button-1>", self._on_global_left_click, add="+")
 
@@ -1969,9 +2409,6 @@ class SaveEditorApp:
         except tk.TclError:
             pass
 
-    def _is_any_combobox_dropdown_open(self) -> bool:
-        return self._combobox_dropdown_open
-
     def find_anchor(self, dec: bytes, anchor: bytes) -> int:
         pos = dec.find(anchor)
         if pos < 0:
@@ -1990,15 +2427,24 @@ class SaveEditorApp:
         self._set_input_mode(keymouse_mode=True)
 
     def _set_input_mode(self, keymouse_mode: bool):
+        if keymouse_mode == self._is_keymouse_mode():
+            return
+
+        # 切替前のUIを保存し、切替先は対応するプロフィールキャッシュから復元する。
+        self._cache_current_active_layout_profile()
+
         previous_suspend = self._suspend_events
         self._suspend_events = True
         try:
             self.keymouse_mode_var.set(keymouse_mode)
+            self._apply_cached_layout_for_current_input()
             self._update_input_mode_ui()
             self._update_mode_linking()
         finally:
             self._suspend_events = previous_suspend
 
+        # 切替先UIで連動同期された値も、直ちに切替先キャッシュへ確定する。
+        self._cache_current_active_layout_profile()
         if not previous_suspend:
             self.update_save_button_state()
 
@@ -2018,9 +2464,11 @@ class SaveEditorApp:
         if (
             self.keybind_group is None
             or self.controller_action_group is None
+            or self.controller_quick_wheel_action_group is None
             or self.controller_photo_action_group is None
             or self.controller_fishing_action_group is None
             or self.keymouse_action_group is None
+            or self.keymouse_quick_wheel_action_group is None
             or self.keymouse_photo_action_group is None
             or self.keymouse_fishing_action_group is None
         ):
@@ -2029,9 +2477,11 @@ class SaveEditorApp:
         if self._is_keymouse_mode():
             self.keybind_group.grid_remove()
             self.controller_action_group.grid_remove()
+            self.controller_quick_wheel_action_group.grid_remove()
             self.controller_photo_action_group.grid_remove()
             self.controller_fishing_action_group.grid_remove()
             self.keymouse_action_group.grid()
+            self.keymouse_quick_wheel_action_group.grid()
             self.keymouse_photo_action_group.grid()
             self.keymouse_fishing_action_group.grid()
 
@@ -2043,10 +2493,12 @@ class SaveEditorApp:
                 self.controller_combobox.configure(state="disabled")
         else:
             self.keymouse_action_group.grid_remove()
+            self.keymouse_quick_wheel_action_group.grid_remove()
             self.keymouse_photo_action_group.grid_remove()
             self.keymouse_fishing_action_group.grid_remove()
             self.keybind_group.grid()
             self.controller_action_group.grid()
+            self.controller_quick_wheel_action_group.grid()
             self.controller_photo_action_group.grid()
             self.controller_fishing_action_group.grid()
 
@@ -2076,86 +2528,225 @@ class SaveEditorApp:
         for combo in self.keymouse_action_control_widgets.get(action_name, []):
             combo.configure(state=state)
 
-    def _sync_controller_mode_linking(
+    def _sync_controller_link_group(
         self,
         mode_actions: list[dict],
         mode_links: dict[str, str],
         independent: bool,
     ):
+        """チェック状態に合わせ、対応するゲームパッド側の項目だけを同期・無効化する。"""
         previous_suspend = self._suspend_events
         self._suspend_events = True
         try:
             for action in mode_actions:
-                mode_name = action["name"]
-                source_name = mode_links.get(mode_name)
-                is_linked = source_name in self.combo_vars
+                mode_id = action["id"]
+                source_id = mode_links.get(mode_id)
+                is_linked = source_id in self.combo_vars
 
+                # 単独設定がオフなら、通常側の値と補助キー状態へ一致させてから無効化する。
                 if not independent and is_linked:
-                    self.combo_vars[mode_name].set(
-                        self.combo_vars[source_name].get()
+                    self.combo_vars[mode_id].set(
+                        self.combo_vars[source_id].get()
                     )
-
                     if (
                         self._controller_action_uses_helper(action)
-                        and source_name in self.action_helper_vars
+                        and source_id in self.action_helper_vars
                     ):
-                        self.action_helper_vars[mode_name].set(
-                            self.action_helper_vars[source_name].get()
+                        self.action_helper_vars[mode_id].set(
+                            self.action_helper_vars[source_id].get()
                         )
 
                 self._set_controller_action_controls_enabled(
-                    mode_name,
+                    mode_id,
                     independent or not is_linked,
                 )
         finally:
             self._suspend_events = previous_suspend
 
-    def _sync_keymouse_mode_linking(
+    def _sync_keymouse_link_group(
         self,
         mode_actions: list[dict],
         mode_links: dict[str, str],
         independent: bool,
     ):
+        """チェック状態に合わせ、対応するキーボード/マウス側の項目だけを同期・無効化する。"""
         previous_suspend = self._suspend_events
         self._suspend_events = True
         try:
             for action in mode_actions:
-                mode_name = action["name"]
-                source_name = mode_links.get(mode_name)
-                is_linked = source_name in self.keymouse_combo_vars
+                mode_id = action["id"]
+                source_id = mode_links.get(mode_id)
+                is_linked = source_id in self.keymouse_combo_vars
 
+                # 単独設定がオフなら、通常側の値へ一致させてから無効化する。
                 if not independent and is_linked:
-                    self.keymouse_combo_vars[mode_name].set(
-                        self.keymouse_combo_vars[source_name].get()
+                    self.keymouse_combo_vars[mode_id].set(
+                        self.keymouse_combo_vars[source_id].get()
                     )
 
                 self._set_keymouse_action_controls_enabled(
-                    mode_name,
+                    mode_id,
                     independent or not is_linked,
                 )
         finally:
             self._suspend_events = previous_suspend
 
     def _update_mode_linking(self):
-        self._sync_controller_mode_linking(
+        """現在表示中の入力方式だけに、単独設定の同期規則を適用する。"""
+        if self._is_keymouse_mode():
+            self._sync_keymouse_link_group(
+                KEYMOUSE_QUICK_WHEEL_ACTIONS,
+                KEYMOUSE_QUICK_WHEEL_LINKS,
+                bool(self.keymouse_quick_wheel_independent_var.get()),
+            )
+            self._sync_keymouse_link_group(
+                KEYMOUSE_PHOTO_MODE_ACTIONS,
+                KEYMOUSE_PHOTO_MODE_LINKS,
+                bool(self.keymouse_photo_mode_independent_var.get()),
+            )
+            self._sync_keymouse_link_group(
+                KEYMOUSE_FISHING_MODE_ACTIONS,
+                KEYMOUSE_FISHING_MODE_LINKS,
+                bool(self.keymouse_fishing_mode_independent_var.get()),
+            )
+            return
+
+        self._sync_controller_link_group(
+            CONTROLLER_QUICK_WHEEL_ACTIONS,
+            CONTROLLER_QUICK_WHEEL_LINKS,
+            bool(self.controller_quick_wheel_independent_var.get()),
+        )
+        self._sync_controller_link_group(
             CONTROLLER_PHOTO_MODE_ACTIONS,
             CONTROLLER_PHOTO_MODE_LINKS,
             bool(self.controller_photo_mode_independent_var.get()),
         )
-        self._sync_keymouse_mode_linking(
-            KEYMOUSE_PHOTO_MODE_ACTIONS,
-            KEYMOUSE_PHOTO_MODE_LINKS,
-            bool(self.keymouse_photo_mode_independent_var.get()),
-        )
-        self._sync_controller_mode_linking(
+        # コントローラの釣りモードには単独設定チェックがないため、常に個別編集。
+        self._sync_controller_link_group(
             CONTROLLER_FISHING_MODE_ACTIONS,
             CONTROLLER_FISHING_MODE_LINKS,
             True,
         )
-        self._sync_keymouse_mode_linking(
+
+    def _restore_controller_linked_actions_from_client(
+        self,
+        mode_actions: list[dict],
+        mode_links: dict[str, str],
+    ):
+        """グレイアウト解除時、対応していたゲームパッド側の項目だけをbytesから復元する。"""
+        if self.original_dec is None:
+            return
+
+        previous_suspend = self._suspend_events
+        self._suspend_events = True
+        try:
+            for action in mode_actions:
+                if action["id"] in mode_links:
+                    self._load_controller_action_from_dec(action, self.original_dec)
+        finally:
+            self._suspend_events = previous_suspend
+
+    def _restore_keymouse_linked_actions_from_client(
+        self,
+        mode_actions: list[dict],
+        mode_links: dict[str, str],
+    ):
+        """グレイアウト解除時、対応していたキーボード/マウス側の項目だけをbytesから復元する。"""
+        if self.original_dec is None:
+            return
+
+        previous_suspend = self._suspend_events
+        self._suspend_events = True
+        try:
+            for action in mode_actions:
+                if action["id"] in mode_links:
+                    self._load_keymouse_action_from_dec(action, self.original_dec)
+        finally:
+            self._suspend_events = previous_suspend
+
+    def _on_controller_independent_changed(
+        self,
+        independent_var: tk.BooleanVar,
+        mode_actions: list[dict],
+        mode_links: dict[str, str],
+    ):
+        if self._suspend_events:
+            return
+
+        independent = bool(independent_var.get())
+        if independent:
+            # 再チェック時だけ、直前までグレイアウトだった対応項目をクライアント値へ戻す。
+            self._restore_controller_linked_actions_from_client(
+                mode_actions,
+                mode_links,
+            )
+
+        self._sync_controller_link_group(
+            mode_actions,
+            mode_links,
+            independent,
+        )
+        self._cache_current_active_layout_profile()
+        self.update_save_button_state()
+
+    def _on_keymouse_independent_changed(
+        self,
+        independent_var: tk.BooleanVar,
+        mode_actions: list[dict],
+        mode_links: dict[str, str],
+    ):
+        if self._suspend_events:
+            return
+
+        independent = bool(independent_var.get())
+        if independent:
+            # 再チェック時だけ、直前までグレイアウトだった対応項目をクライアント値へ戻す。
+            self._restore_keymouse_linked_actions_from_client(
+                mode_actions,
+                mode_links,
+            )
+
+        self._sync_keymouse_link_group(
+            mode_actions,
+            mode_links,
+            independent,
+        )
+        self._cache_current_active_layout_profile()
+        self.update_save_button_state()
+
+    def _on_controller_quick_wheel_independent_changed(self, *args):
+        self._on_controller_independent_changed(
+            self.controller_quick_wheel_independent_var,
+            CONTROLLER_QUICK_WHEEL_ACTIONS,
+            CONTROLLER_QUICK_WHEEL_LINKS,
+        )
+
+    def _on_keymouse_quick_wheel_independent_changed(self, *args):
+        self._on_keymouse_independent_changed(
+            self.keymouse_quick_wheel_independent_var,
+            KEYMOUSE_QUICK_WHEEL_ACTIONS,
+            KEYMOUSE_QUICK_WHEEL_LINKS,
+        )
+
+    def _on_controller_photo_mode_independent_changed(self, *args):
+        self._on_controller_independent_changed(
+            self.controller_photo_mode_independent_var,
+            CONTROLLER_PHOTO_MODE_ACTIONS,
+            CONTROLLER_PHOTO_MODE_LINKS,
+        )
+
+    def _on_keymouse_photo_mode_independent_changed(self, *args):
+        self._on_keymouse_independent_changed(
+            self.keymouse_photo_mode_independent_var,
+            KEYMOUSE_PHOTO_MODE_ACTIONS,
+            KEYMOUSE_PHOTO_MODE_LINKS,
+        )
+
+    def _on_keymouse_fishing_mode_independent_changed(self, *args):
+        self._on_keymouse_independent_changed(
+            self.keymouse_fishing_mode_independent_var,
             KEYMOUSE_FISHING_MODE_ACTIONS,
             KEYMOUSE_FISHING_MODE_LINKS,
-            bool(self.keymouse_fishing_mode_independent_var.get()),
         )
 
     def get_input_offsets(self, action: dict, dec: Optional[bytes] = None) -> list[int]:
@@ -2169,7 +2760,7 @@ class SaveEditorApp:
             raise ValueError("入力設定が読み込まれていません。")
 
         rel_candidates = list(action["rel_offsets"])
-        for rel in ACTION_CONTROLLER_OFFSET_ALIASES.get(action["name"], []):
+        for rel in ACTION_CONTROLLER_OFFSET_ALIASES.get(action["id"], []):
             if rel not in rel_candidates:
                 rel_candidates.append(rel)
 
@@ -2198,7 +2789,7 @@ class SaveEditorApp:
             raise ValueError("入力設定が読み込まれていません。")
 
         rel_candidates = list(action["rel_offsets"])
-        for rel in ACTION_KEYMOUSE_OFFSET_ALIASES.get(action["name"], []):
+        for rel in ACTION_KEYMOUSE_OFFSET_ALIASES.get(action["id"], []):
             if rel not in rel_candidates:
                 rel_candidates.append(rel)
 
@@ -2268,7 +2859,7 @@ class SaveEditorApp:
     def _controller_action_uses_helper(self, action: dict) -> bool:
         if "uses_helper" in action:
             return bool(action["uses_helper"])
-        return action["name"] not in SPECIAL_ACTIONS_WITHOUT_HELPER
+        return action["id"] not in SPECIAL_CONTROLLER_ACTION_IDS_WITHOUT_HELPER
 
     def _get_controller_action_allowed_values(self, action: dict) -> list[int]:
         if "allowed_values" in action:
@@ -2315,7 +2906,7 @@ class SaveEditorApp:
         return self.preset_anchor_pos + PRESET_REL_OFFSET
 
     def _is_valid_helper_main_value(self, value: int) -> bool:
-        return value in HELPER_VALUE_TO_LABEL
+        return value in HELPER_MAIN_VALUES
 
     def find_helper_main_offsets(self, dec: bytes) -> tuple[int, int]:
         petwheel_pos = dec.find(HELPER_PETWHEEL_ANCHOR)
@@ -2348,14 +2939,14 @@ class SaveEditorApp:
             raise ValueError("補助キー2の保存位置を特定できません。")
         return self.helper2_main_pos
 
-    def _ensure_combo_has_value(self, action_name: str, value: int, label: str):
-        combo = self.comboboxes[action_name]
+    def _ensure_combo_has_value(self, action_id: str, label: str):
+        combo = self.comboboxes[action_id]
         current_values = list(combo["values"])
         if label not in current_values:
             current_values.append(label)
             combo["values"] = current_values
 
-    def _ensure_preset_has_value(self, value: int, label: str):
+    def _ensure_preset_has_value(self, label: str):
         if self.preset_combobox is None:
             return
         current_values = list(self.preset_combobox["values"])
@@ -2363,7 +2954,7 @@ class SaveEditorApp:
             current_values.append(label)
             self.preset_combobox["values"] = current_values
 
-    def _ensure_helper_has_value(self, which: str, value: int, label: str):
+    def _ensure_helper_has_value(self, which: str, label: str):
         combo = self.helper1_combobox if which == "helper1" else self.helper2_combobox
         if combo is None:
             return
@@ -2390,9 +2981,6 @@ class SaveEditorApp:
     def _get_current_preset_value_to_label(self) -> dict[int, str]:
         return {value: label for value, label in self._get_current_preset_options()}
 
-    def _get_current_preset_label_to_value(self) -> dict[str, int]:
-        return {label: value for value, label in self._get_current_preset_options()}
-
     def _get_helper_value_to_label(self) -> dict[int, str]:
         action_map = self._get_current_action_value_to_label()
         return {
@@ -2415,16 +3003,6 @@ class SaveEditorApp:
         if helper2_label and helper2_label not in values:
             values.append(helper2_label)
         return values
-
-    def _get_action_helper_display_to_state(self) -> dict[str, int]:
-        mapping = {ACTION_HELPER_NONE_LABEL: ACTION_STATE_SINGLE}
-        helper1_label = self.helper1_var.get()
-        helper2_label = self.helper2_var.get()
-        if helper1_label:
-            mapping[helper1_label] = ACTION_STATE_HELPER1
-        if helper2_label:
-            mapping[helper2_label] = ACTION_STATE_HELPER2
-        return mapping
 
     def _refresh_action_helper_combobox_choices(self, old_helper1_label: Optional[str] = None, old_helper2_label: Optional[str] = None):
         new_values = self._get_action_helper_display_values()
@@ -2470,9 +3048,9 @@ class SaveEditorApp:
     def _refresh_action_combobox_choices(self):
         """ゲームパッド用の各アクションに、許可されたボタン候補を反映する。"""
         for action in ACTIONS:
-            name = action["name"]
-            combo = self.comboboxes.get(name)
-            var = self.combo_vars.get(name)
+            action_id = action["id"]
+            combo = self.comboboxes.get(action_id)
+            var = self.combo_vars.get(action_id)
             if combo is None or var is None:
                 continue
 
@@ -2561,6 +3139,7 @@ class SaveEditorApp:
             return
 
         self._update_mode_linking()
+        self._cache_current_active_layout_profile()
         self.update_save_button_state()
 
     def _clear_conflicts_for_helper_value(self, helper_main_value: int, other_helper: str):
@@ -2572,11 +3151,11 @@ class SaveEditorApp:
         helper_label_to_value = self._get_helper_label_to_value()
 
         for action in ACTIONS:
-            name = action["name"]
+            action_id = action["id"]
             if not self._controller_action_uses_helper(action):
                 continue
 
-            var = self.combo_vars.get(name)
+            var = self.combo_vars.get(action_id)
             if var is None:
                 continue
 
@@ -2607,6 +3186,7 @@ class SaveEditorApp:
         finally:
             self._suspend_events = False
 
+        self._cache_current_active_layout_profile()
         self.update_save_button_state()
 
     def _on_helper1_changed(self, *args):
@@ -2631,6 +3211,7 @@ class SaveEditorApp:
         finally:
             self._suspend_events = False
 
+        self._cache_current_active_layout_profile()
         self.update_save_button_state()
 
     def _on_helper2_changed(self, *args):
@@ -2655,43 +3236,129 @@ class SaveEditorApp:
         finally:
             self._suspend_events = False
 
+        self._cache_current_active_layout_profile()
         self.update_save_button_state()
+
+    def _profile_has_blank_required_fields(
+        self,
+        profile: dict,
+        profile_name: str,
+    ) -> bool:
+        if not isinstance(profile, dict):
+            return True
+
+        actions = profile.get("actions")
+        if not isinstance(actions, dict):
+            return True
+
+        if profile_name == "controller":
+            keybind = profile.get("keybind")
+            if not isinstance(keybind, dict):
+                return True
+            if any(not keybind.get(name) for name in ("helper1", "helper2", "preset")):
+                return True
+
+            for action in ACTIONS:
+                saved = actions.get(action["id"])
+                if not isinstance(saved, dict) or not saved.get("button"):
+                    return True
+                if self._controller_action_uses_helper(action) and not saved.get("helper"):
+                    return True
+            return False
+
+        for action in KEYMOUSE_ACTIONS:
+            saved = actions.get(action["id"])
+            if not isinstance(saved, dict) or not saved.get("key"):
+                return True
+        return False
 
     def has_blank_required_fields(self) -> bool:
         if self.file_path is None:
             return True
 
-        if self._is_keymouse_mode():
-            return any(not var.get() for var in self.keymouse_combo_vars.values())
+        self._cache_current_active_layout_profile()
+        return (
+            self._profile_has_blank_required_fields(
+                self._layout_profile_cache.get("controller"),
+                "controller",
+            )
+            or self._profile_has_blank_required_fields(
+                self._layout_profile_cache.get("keymouse"),
+                "keymouse",
+            )
+        )
 
-        if not self.helper1_var.get():
-            return True
-        if not self.helper2_var.get():
-            return True
-        if not self.preset_var.get():
-            return True
+    def update_save_button_state(self):
+        has_blank_fields = self.has_blank_required_fields()
 
-        return any(not var.get() for var in self.combo_vars.values())
+        if self.save_button is not None:
+            self.save_button.config(
+                state="disabled" if has_blank_fields else "normal"
+            )
 
-    def update_status_message(self):
+        if self.open_selected_file_location_button is not None:
+            self.open_selected_file_location_button.config(
+                state="normal" if self.file_path is not None else "disabled"
+            )
+
         if self.file_path is None:
             self.status_var.set(self.base_status_message)
-            return
-
-        if self.has_blank_required_fields():
+        elif has_blank_fields:
             self.status_var.set("未設定の項目があります")
         else:
             self.status_var.set(self.base_status_message)
 
-    def update_save_button_state(self):
-        if self.file_path is None or self.has_blank_required_fields():
-            if self.save_button is not None:
-                self.save_button.config(state="disabled")
-        else:
-            if self.save_button is not None:
-                self.save_button.config(state="normal")
+    def _open_file_location(
+        self,
+        file_path: Optional[Path],
+        unavailable_message: str,
+    ):
+        """指定ファイルを選択した状態で、その保存先フォルダを開く。"""
+        if file_path is None:
+            messagebox.showerror("場所を開けません", unavailable_message)
+            return
 
-        self.update_status_message()
+        target = Path(file_path).expanduser().resolve()
+        folder = target.parent
+        if not folder.is_dir():
+            messagebox.showerror(
+                "場所を開けません",
+                f"保存先フォルダが見つかりません。\n{folder}",
+            )
+            return
+
+        try:
+            if sys.platform == "win32":
+                if target.exists():
+                    subprocess.Popen(["explorer.exe", f"/select,{target}"])
+                else:
+                    subprocess.Popen(["explorer.exe", str(folder)])
+            elif sys.platform == "darwin":
+                if target.exists():
+                    subprocess.Popen(["open", "-R", str(target)])
+                else:
+                    subprocess.Popen(["open", str(folder)])
+            else:
+                subprocess.Popen(["xdg-open", str(folder)])
+        except OSError as ex:
+            messagebox.showerror(
+                "場所を開けません",
+                f"保存先フォルダを開けませんでした。\n{ex}",
+            )
+
+    def open_selected_file_location(self):
+        """現在読み込み済みの localsave.bytes の場所を開く。"""
+        self._open_file_location(
+            self.file_path,
+            "設定ファイルを先に選択してください。",
+        )
+
+    def open_button_layout_location(self):
+        """キー設定プリセット JSON の保存先を開く。"""
+        self._open_file_location(
+            self.get_button_layout_path(),
+            "キー設定プリセットの保存先を特定できません。",
+        )
 
     def select_file(self):
         default_dir = self._resolve_default_open_dir()
@@ -2871,6 +3538,12 @@ class SaveEditorApp:
 
             self.file_path = file_path
             self.original_dec = dec
+            # 新しい設定ファイルを読み込んだ時は、以前に読み込んだJSON配置の
+            # 切替キャッシュを破棄し、両入力方式ともこのbytesを基準に戻す。
+            self._layout_profile_cache = {
+                "controller": None,
+                "keymouse": None,
+            }
             self.path_var.set(str(file_path))
 
             if sync_detected_selection:
@@ -2891,6 +3564,8 @@ class SaveEditorApp:
                 self._update_input_mode_ui()
             finally:
                 self._suspend_events = False
+
+            self._initialize_layout_profile_cache_from_ui()
 
             if self.reset_button is not None:
                 self.reset_button.config(state="normal")
@@ -2933,8 +3608,40 @@ class SaveEditorApp:
                     return label
         return None
 
-    def _load_controller_values_from_dec(self, dec: bytes):
+    def _load_controller_action_from_dec(self, action: dict, dec: bytes):
+        """1件のゲームパッドアクションをbytesからUIへ反映する。"""
+        action_id = action["id"]
         action_value_to_label = self._get_current_action_value_to_label()
+        action_helper_values = self._get_action_helper_display_values()
+
+        offsets = self.get_input_offsets(action, dec)
+        first_off = offsets[0]
+        first_value = int.from_bytes(dec[first_off:first_off + 4], "little")
+        state_dword = int.from_bytes(dec[first_off + 4:first_off + 8], "little")
+
+        label = action_value_to_label.get(first_value)
+        if label is None:
+            label = "不明"
+            self._ensure_combo_has_value(action_id, label)
+
+        if not self._controller_action_uses_helper(action):
+            helper_label = ACTION_HELPER_NONE_LABEL
+        elif state_dword == ACTION_STATE_SINGLE:
+            helper_label = ACTION_HELPER_NONE_LABEL
+        elif state_dword == ACTION_STATE_HELPER1:
+            helper_label = self.helper1_var.get()
+        elif state_dword == ACTION_STATE_HELPER2:
+            helper_label = self.helper2_var.get()
+        else:
+            helper_label = ACTION_HELPER_NONE_LABEL
+
+        if helper_label not in action_helper_values:
+            helper_label = ACTION_HELPER_NONE_LABEL
+
+        self.action_helper_vars[action_id].set(helper_label)
+        self.combo_vars[action_id].set(label)
+
+    def _load_controller_values_from_dec(self, dec: bytes):
         helper_value_to_label = self._get_helper_value_to_label()
         preset_value_to_label = self._get_current_preset_value_to_label()
 
@@ -2944,7 +3651,7 @@ class SaveEditorApp:
             preset_label = preset_value_to_label.get(preset_value)
             if preset_label is None:
                 preset_label = "不明"
-                self._ensure_preset_has_value(preset_value, preset_label)
+                self._ensure_preset_has_value(preset_label)
         else:
             preset_label = self._get_default_preset_label()
         self.preset_var.set(preset_label)
@@ -2954,7 +3661,7 @@ class SaveEditorApp:
         helper1_label = helper_value_to_label.get(helper1_value)
         if helper1_label is None:
             helper1_label = "不明"
-            self._ensure_helper_has_value("helper1", helper1_value, helper1_label)
+            self._ensure_helper_has_value("helper1", helper1_label)
         self.helper1_var.set(helper1_label)
 
         helper2_off = self.get_helper2_main_offset()
@@ -2962,60 +3669,36 @@ class SaveEditorApp:
         helper2_label = helper_value_to_label.get(helper2_value)
         if helper2_label is None:
             helper2_label = "不明"
-            self._ensure_helper_has_value("helper2", helper2_value, helper2_label)
+            self._ensure_helper_has_value("helper2", helper2_label)
         self.helper2_var.set(helper2_label)
 
-        action_helper_values = self._get_action_helper_display_values()
-
         for action in ACTIONS:
-            name = action["name"]
-            offsets = self.get_input_offsets(action, dec)
-            first_off = offsets[0]
-            first_value = int.from_bytes(dec[first_off:first_off + 4], "little")
-            state_dword = int.from_bytes(dec[first_off + 4:first_off + 8], "little")
+            self._load_controller_action_from_dec(action, dec)
 
-            label = action_value_to_label.get(first_value)
-            if label is None:
-                label = "不明"
-                self._ensure_combo_has_value(name, first_value, label)
+    def _load_keymouse_action_from_dec(self, action: dict, dec: bytes):
+        """1件のキーボード/マウスアクションをbytesからUIへ反映する。"""
+        action_id = action["id"]
+        offsets = self.get_keymouse_input_offsets(action, dec)
+        first_off = offsets[0]
 
-            if not self._controller_action_uses_helper(action):
-                helper_label = ACTION_HELPER_NONE_LABEL
-            elif state_dword == ACTION_STATE_SINGLE:
-                helper_label = ACTION_HELPER_NONE_LABEL
-            elif state_dword == ACTION_STATE_HELPER1:
-                helper_label = self.helper1_var.get()
-            elif state_dword == ACTION_STATE_HELPER2:
-                helper_label = self.helper2_var.get()
-            else:
-                helper_label = ACTION_HELPER_NONE_LABEL
+        input_type = int.from_bytes(dec[first_off - 4:first_off], "little")
+        value = int.from_bytes(dec[first_off:first_off + 4], "little")
+        label = KEYMOUSE_RECORD_TO_LABEL.get((input_type, value))
 
-            if helper_label not in action_helper_values:
-                helper_label = ACTION_HELPER_NONE_LABEL
+        if label is None:
+            label = f"不明 (type=0x{input_type:08X}, value=0x{value:08X})"
+            self._append_keymouse_combo_value_if_missing(
+                action_id,
+                label,
+                input_type,
+                value,
+            )
 
-            self.action_helper_vars[name].set(helper_label)
-            self.combo_vars[name].set(label)
+        self.keymouse_combo_vars[action_id].set(label)
 
     def _load_keymouse_values_from_dec(self, dec: bytes):
         for action in KEYMOUSE_ACTIONS:
-            name = action["name"]
-            offsets = self.get_keymouse_input_offsets(action, dec)
-            first_off = offsets[0]
-
-            input_type = int.from_bytes(dec[first_off - 4:first_off], "little")
-            value = int.from_bytes(dec[first_off:first_off + 4], "little")
-            label = KEYMOUSE_RECORD_TO_LABEL.get((input_type, value))
-
-            if label is None:
-                label = f"不明 (type=0x{input_type:08X}, value=0x{value:08X})"
-                self._append_keymouse_combo_value_if_missing(
-                    name,
-                    label,
-                    input_type,
-                    value,
-                )
-
-            self.keymouse_combo_vars[name].set(label)
+            self._load_keymouse_action_from_dec(action, dec)
 
     def _load_values_from_dec(self, dec: bytes):
         self._load_controller_values_from_dec(dec)
@@ -3036,6 +3719,7 @@ class SaveEditorApp:
         finally:
             self._suspend_events = False
 
+        self._initialize_layout_profile_cache_from_ui()
         self.base_status_message = "読み込み時の状態に戻しました"
         self.update_save_button_state()
 
@@ -3043,96 +3727,135 @@ class SaveEditorApp:
         if self.file_path is None:
             raise ValueError("設定ファイルが選択されていません。")
 
-        enc = brotli.compress(bytes(dec), quality=1)
-        self.file_path.write_bytes(enc)
+        self.file_path.write_bytes(brotli.compress(bytes(dec), quality=1))
+        # 保存した両プロフィールとUIは変更済みbytesと一致するため、ここでbytesを
+        # UIへ読み戻してキャッシュを上書きしない。
         self.original_dec = bytes(dec)
 
-        self._suspend_events = True
-        try:
-            self._load_values_from_dec(self.original_dec)
-            self._refresh_action_combobox_choices()
-            self._refresh_action_helper_combobox_choices()
-            self._update_preset_editability()
-            self._update_input_mode_ui()
-        finally:
-            self._suspend_events = False
+    def _write_controller_profile_to_dec(
+        self,
+        dec: bytearray,
+        profile: dict,
+    ):
+        controller_type = profile.get("controller_type")
+        if controller_type not in CONTROLLER_OPTIONS:
+            raise ValueError("ゲームパッド種類の値が不正です。")
 
-    def _save_controller_file(self):
-        if self.original_dec is None:
-            raise ValueError("設定ファイルが読み込まれていません。")
+        keybind = profile.get("keybind")
+        actions = profile.get("actions")
+        if not isinstance(keybind, dict) or not isinstance(actions, dict):
+            raise ValueError("ゲームパッド配置の形式が不正です。")
 
-        self._update_mode_linking()
-        dec = bytearray(self.original_dec)
+        action_value_to_label = CONTROLLER_DISPLAY_MAPS[controller_type]
+        action_label_to_value = {
+            label: value
+            for value, label in action_value_to_label.items()
+        }
+        helper_label_to_value = {
+            action_value_to_label[17]: 0x01,
+            action_value_to_label[18]: 0x02,
+            action_value_to_label[5]: 0x04,
+            action_value_to_label[6]: 0x08,
+        }
+        preset_label_to_value = {
+            label: value
+            for value, label in PRESET_OPTIONS[controller_type]
+        }
 
-        if self._preset_supported:
-            preset_label_to_value = self._get_current_preset_label_to_value()
-            preset_label = self.preset_var.get()
-            if preset_label not in preset_label_to_value:
-                raise ValueError("確認/キャンセルの値が不正です。")
-            dec[self.get_preset_offset()] = preset_label_to_value[preset_label]
-
-        helper_label_to_value = self._get_helper_label_to_value()
-        action_label_to_value = self._get_current_action_label_to_value()
-        action_helper_display_to_state = self._get_action_helper_display_to_state()
-
-        helper1_label = self.helper1_var.get()
+        helper1_label = keybind.get("helper1")
+        helper2_label = keybind.get("helper2")
+        preset_label = keybind.get("preset")
         if helper1_label not in helper_label_to_value:
             raise ValueError("補助キー1の値が不正です。")
-        helper1_value = helper_label_to_value[helper1_label]
-        helper1_off = self.get_helper1_main_offset()
-        dec[helper1_off:helper1_off + 4] = helper1_value.to_bytes(4, "little")
-
-        helper2_label = self.helper2_var.get()
         if helper2_label not in helper_label_to_value:
             raise ValueError("補助キー2の値が不正です。")
+        if self._preset_supported and preset_label not in preset_label_to_value:
+            raise ValueError("確認/キャンセルの値が不正です。")
+
+        helper1_value = helper_label_to_value[helper1_label]
         helper2_value = helper_label_to_value[helper2_label]
+        action_helper_display_to_state = {
+            ACTION_HELPER_NONE_LABEL: ACTION_STATE_SINGLE,
+            helper1_label: ACTION_STATE_HELPER1,
+            helper2_label: ACTION_STATE_HELPER2,
+        }
+
+        if self._preset_supported:
+            dec[self.get_preset_offset()] = preset_label_to_value[preset_label]
+
+        helper1_off = self.get_helper1_main_offset()
         helper2_off = self.get_helper2_main_offset()
+        dec[helper1_off:helper1_off + 4] = helper1_value.to_bytes(4, "little")
         dec[helper2_off:helper2_off + 4] = helper2_value.to_bytes(4, "little")
 
         for action in ACTIONS:
-            name = action["name"]
-            selected_label = self.combo_vars[name].get()
+            action_id = action["id"]
+            saved = actions.get(action_id)
+            if not isinstance(saved, dict):
+                raise ValueError(f"{action['name']} の保存値がありません。")
+
+            selected_label = saved.get("button")
             if selected_label not in action_label_to_value:
-                raise ValueError(f"{name} の値が不正です。")
+                raise ValueError(f"{action['name']} の値が不正です。")
 
             if self._controller_action_uses_helper(action):
-                helper_display = self.action_helper_vars[name].get()
+                helper_display = saved.get("helper")
                 if helper_display not in action_helper_display_to_state:
-                    raise ValueError(f"{name} の補助キー設定が不正です。")
+                    raise ValueError(f"{action['name']} の補助キー設定が不正です。")
                 state_dword = action_helper_display_to_state[helper_display]
             else:
                 state_dword = ACTION_STATE_SINGLE
 
             value = action_label_to_value[selected_label]
-
             for off in self.get_writable_input_offsets(action, self.original_dec):
                 dec[off:off + 4] = value.to_bytes(4, "little")
                 dec[off + 4:off + 8] = state_dword.to_bytes(4, "little")
 
-        self._commit_saved_dec(dec)
-
-    def _save_keymouse_file(self):
-        if self.original_dec is None:
-            raise ValueError("設定ファイルが読み込まれていません。")
-
-        self._update_mode_linking()
-        dec = bytearray(self.original_dec)
+    def _write_keymouse_profile_to_dec(
+        self,
+        dec: bytearray,
+        profile: dict,
+    ):
+        actions = profile.get("actions")
+        if not isinstance(actions, dict):
+            raise ValueError("キーボード/マウス配置の形式が不正です。")
 
         for action in KEYMOUSE_ACTIONS:
-            name = action["name"]
-            selected_label = self.keymouse_combo_vars[name].get()
+            action_id = action["id"]
+            saved = actions.get(action_id)
+            if not isinstance(saved, dict):
+                raise ValueError(f"{action['name']} の保存値がありません。")
 
+            selected_label = saved.get("key")
             record = KEYMOUSE_LABEL_TO_RECORD.get(selected_label)
             if record is None:
                 record = self._keymouse_custom_records.get(selected_label)
             if record is None:
-                raise ValueError(f"{name} のキーが不正です。")
+                raise ValueError(f"{action['name']} のキーが不正です。")
 
             input_type, value = record
             for off in self.get_writable_keymouse_offsets(action, self.original_dec):
                 dec[off - 4:off] = input_type.to_bytes(4, "little")
                 dec[off:off + 4] = value.to_bytes(4, "little")
 
+    def _save_all_profiles(self):
+        if self.original_dec is None:
+            raise ValueError("設定ファイルが読み込まれていません。")
+
+        # 現在側の編集UIを確定し、保存対象は常に両プロフィールキャッシュにする。
+        self._cache_current_active_layout_profile()
+        controller_profile = self._normalize_controller_layout_profile(
+            self._get_cached_layout_profile("controller")
+        )
+        keymouse_profile = self._normalize_keymouse_layout_profile(
+            self._get_cached_layout_profile("keymouse")
+        )
+        self._layout_profile_cache["controller"] = copy.deepcopy(controller_profile)
+        self._layout_profile_cache["keymouse"] = copy.deepcopy(keymouse_profile)
+
+        dec = bytearray(self.original_dec)
+        self._write_controller_profile_to_dec(dec, controller_profile)
+        self._write_keymouse_profile_to_dec(dec, keymouse_profile)
         self._commit_saved_dec(dec)
 
     def save_file(self):
@@ -3144,11 +3867,7 @@ class SaveEditorApp:
             return
 
         try:
-            if self._is_keymouse_mode():
-                self._save_keymouse_file()
-            else:
-                self._save_controller_file()
-
+            self._save_all_profiles()
             preset_path = self._write_button_layout_file()
 
             self.base_status_message = "保存しました"
