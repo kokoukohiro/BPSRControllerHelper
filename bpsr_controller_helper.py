@@ -1508,7 +1508,7 @@ class SaveEditorApp:
             self.update_save_button_state()
             messagebox.showinfo(
                 "配置読み込み",
-                "キー設定を読み込みました。\nゲーム設定へ反映するには、通常の保存ボタンを押してください。",
+                "キー設定を読み込みました。\nゲーム設定へ反映するには、保存ボタンを押してください。",
             )
         except Exception as ex:
             self.base_status_message = "キー設定の読み込みに失敗しました"
