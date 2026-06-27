@@ -329,6 +329,7 @@ CONTROLLER_FISHING_MODE_ACTIONS = [
     _make_action(ACTION_GROUP_FISHING, 'モード/ガイド', [0x02AD4]),
     _make_action(ACTION_GROUP_FISHING, '設定', [0x02B11]),
     _make_action(ACTION_GROUP_FISHING, 'メニューを閉じる', [0x02C3F]),
+    _make_action(ACTION_GROUP_FISHING, 'ソーシャルモード', [0x02C02]),
 ]
 
 # bytes読込・保存など全件走査が必要な処理だけ、明示的に全グループを結合して使う。
@@ -596,6 +597,7 @@ KEYMOUSE_FISHING_MODE_ACTIONS = [
     _make_action(ACTION_GROUP_FISHING, '設定', [0x02AF7]),
     _make_action(ACTION_GROUP_FISHING, 'マウス呼出し', [0x02B34]),
     _make_action(ACTION_GROUP_FISHING, 'メニューを閉じる', [0x02C25]),
+    _make_action(ACTION_GROUP_FISHING, 'ソーシャルモード', [0x02BE8]),
     _make_action(ACTION_GROUP_FISHING, 'トーク', [0x02C62]),
     _make_action(ACTION_GROUP_FISHING, 'トークチャンネル上切替', [0x02C85]),
     _make_action(ACTION_GROUP_FISHING, 'トークチャンネル下切替', [0x02CA8]),
@@ -622,21 +624,137 @@ KEYMOUSE_LCTRL_PREFIX_ACTION_IDS = {
 }
 
 # =========================
-# lodef / UU1 兼用補正
-# 一部アクションでは controller と keymouse の並びが入れ替わる。
-# group + name で固定した id を使い、typeで実際のvalue位置を選ぶ。
+# 入力割り当てデータの配置
+# 既知の入力割り当てデータ更新の前後では、一部アクションのゲームパッドと
+# キーボード/マウスの物理スロットが入れ替わる。
+#
+# rel_offsets は解析済みの物理スロットを保持する。複数ある場合は、選択中の
+# 配置で有効な同一アクションの全スロットへ保存する。ただし、同じ物理領域を
+# 別入力方式が使用する配置では、その領域を所有する側だけが保存する。
+# これは既存レコードごとの判定ではなく、設定ファイル全体で一度だけ確定する
+# 配置定義である。
+#
+# 書込み先の既存type/stateは保存可否に使わない。選択された配置の所有スロット
+# であれば、未生成の入力スロットも直接初期化して書き込む。
 # =========================
-ACTION_CONTROLLER_OFFSET_ALIASES = {
-    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00241],
-    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FF0],
-    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
+INPUT_BINDING_LAYOUT_BEFORE_UPDATE = "before_binding_update"
+INPUT_BINDING_LAYOUT_AFTER_UPDATE = "after_binding_update"
+
+# 5組は、更新前配置ではキーボード/マウス側の後半スロット、更新後配置では
+# ゲームパッド側の後半スロットとして使われる。両方を同時に保存すると3 byte
+# 単位で物理的に重なるため、配置ごとに所有者を固定する。
+
+# 各配置で action["rel_offsets"] の代わりに使う完全な物理スロット集合。
+# 辞書にないアクションは rel_offsets 全件をそのまま使う。
+CONTROLLER_BINDING_LAYOUT_REL_OFFSETS = {
+    INPUT_BINDING_LAYOUT_BEFORE_UPDATE: {
+        # 更新前は後半位置がキーボード/マウス側に属するため、前半の
+        # ゲームパッドスロットだけを使う。
+        _make_action_id(ACTION_GROUP_MAIN, "アクション"): [0x00551],
+        _make_action_id(ACTION_GROUP_MAIN, "アイテムを使用"): [0x0090D],
+        _make_action_id(ACTION_GROUP_MAIN, "招待承認"): [0x00BE1],
+        _make_action_id(ACTION_GROUP_MAIN, "招待拒否"): [0x00C1E],
+        _make_action_id(ACTION_GROUP_MAIN, "スキルパレットを開く"): [0x01227],
+    },
+    INPUT_BINDING_LAYOUT_AFTER_UPDATE: {
+        _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00241],
+        _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FF0],
+        _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
+    },
 }
 
-ACTION_KEYMOUSE_OFFSET_ALIASES = {
-    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00227],
-    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FD6],
-    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x0124A],
+KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS = {
+    INPUT_BINDING_LAYOUT_BEFORE_UPDATE: {
+        # この位置は更新前のゲームパッドレコードと重なるため、キーボード/
+        # マウス側のホーム設計図は先頭位置だけを使う。
+        _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
+    },
+    INPUT_BINDING_LAYOUT_AFTER_UPDATE: {
+        _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00227],
+        _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FD6],
+        _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x0124A],
+        # 更新後は後半位置がゲームパッド側の同一アクションへ移るため、
+        # キーボード/マウス側は前半スロットだけを使う。
+        _make_action_id(ACTION_GROUP_MAIN, "アクション"): [0x00537],
+        _make_action_id(ACTION_GROUP_MAIN, "アイテムを使用"): [0x008F3],
+        _make_action_id(ACTION_GROUP_MAIN, "招待承認"): [0x00BC7],
+        _make_action_id(ACTION_GROUP_MAIN, "招待拒否"): [0x00C04],
+        _make_action_id(ACTION_GROUP_MAIN, "スキルパレットを開く"): [0x0120D],
+    },
 }
+
+
+def _get_binding_layout_rel_offsets(
+    action: dict,
+    binding_layout: str,
+    layout_rel_offsets: dict[str, dict[str, list[int]]],
+) -> list[int]:
+    layout_overrides = layout_rel_offsets[binding_layout]
+    return list(layout_overrides.get(action["id"], action["rel_offsets"]))
+
+
+def _iter_binding_write_ranges(
+    actions: list[dict],
+    binding_layout: str,
+    layout_rel_offsets: dict[str, dict[str, list[int]]],
+    *,
+    controller: bool,
+):
+    for action in actions:
+        for rel_offset in _get_binding_layout_rel_offsets(
+            action,
+            binding_layout,
+            layout_rel_offsets,
+        ):
+            # ゲームパッドは type + value + state、キーボード/マウスは
+            # type + value を初期化する。
+            start = rel_offset - 4
+            end = rel_offset + 8 if controller else rel_offset + 4
+            yield start, end, action["id"], rel_offset
+
+
+def _validate_binding_layout_slot_ownership():
+    """各配置で、保存対象の物理書込み範囲が重ならないことを検証する。"""
+    for binding_layout in (
+        INPUT_BINDING_LAYOUT_BEFORE_UPDATE,
+        INPUT_BINDING_LAYOUT_AFTER_UPDATE,
+    ):
+        write_ranges = [
+            *(
+                (start, end, "controller", action_id, rel_offset)
+                for start, end, action_id, rel_offset in _iter_binding_write_ranges(
+                    ACTIONS,
+                    binding_layout,
+                    CONTROLLER_BINDING_LAYOUT_REL_OFFSETS,
+                    controller=True,
+                )
+            ),
+            *(
+                (start, end, "keymouse", action_id, rel_offset)
+                for start, end, action_id, rel_offset in _iter_binding_write_ranges(
+                    KEYMOUSE_ACTIONS,
+                    binding_layout,
+                    KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS,
+                    controller=False,
+                )
+            ),
+        ]
+
+        for index, current in enumerate(write_ranges):
+            current_start, current_end, current_device, current_action_id, current_rel = current
+            for other in write_ranges[index + 1:]:
+                other_start, other_end, other_device, other_action_id, other_rel = other
+                if max(current_start, other_start) >= min(current_end, other_end):
+                    continue
+                raise RuntimeError(
+                    "入力割り当ての書込み範囲が重複しています: "
+                    f"{binding_layout} / "
+                    f"{current_device}:{current_action_id}@0x{current_rel:05X} / "
+                    f"{other_device}:{other_action_id}@0x{other_rel:05X}"
+                )
+
+
+_validate_binding_layout_slot_ownership()
 
 
 # =========================
@@ -832,6 +950,8 @@ class SaveEditorApp:
         self.original_dec: Optional[bytes] = None
 
         self.input_anchor_pos: Optional[int] = None
+        # 設定ファイル読込時に一度だけ識別し、以後の読込・保存で共通に使う。
+        self._binding_data_layout = INPUT_BINDING_LAYOUT_BEFORE_UPDATE
         self.preset_anchor_pos: Optional[int] = None
         self.helper1_main_pos: Optional[int] = None
         self.helper2_main_pos: Optional[int] = None
@@ -865,6 +985,7 @@ class SaveEditorApp:
         self.keymouse_quick_wheel_independent_var = tk.BooleanVar(value=False)
         self.controller_photo_mode_independent_var = tk.BooleanVar(value=False)
         self.keymouse_photo_mode_independent_var = tk.BooleanVar(value=False)
+        self.controller_fishing_mode_independent_var = tk.BooleanVar(value=False)
         self.keymouse_fishing_mode_independent_var = tk.BooleanVar(value=False)
 
         self.preset_combobox: Optional[ttk.Combobox] = None
@@ -884,6 +1005,7 @@ class SaveEditorApp:
         self.keymouse_quick_wheel_checkbutton: Optional[ttk.Checkbutton] = None
         self.controller_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_photo_mode_checkbutton: Optional[ttk.Checkbutton] = None
+        self.controller_fishing_mode_checkbutton: Optional[ttk.Checkbutton] = None
         self.keymouse_fishing_mode_checkbutton: Optional[ttk.Checkbutton] = None
 
         self.keybind_group: Optional[ttk.LabelFrame] = None
@@ -959,6 +1081,9 @@ class SaveEditorApp:
                 self.controller_photo_mode_independent_var.set(
                     controller_profile.get("photo_mode_independent") is True
                 )
+                self.controller_fishing_mode_independent_var.set(
+                    controller_profile.get("fishing_mode_independent") is True
+                )
 
             if isinstance(keymouse_profile, dict):
                 self.keymouse_quick_wheel_independent_var.set(
@@ -1002,6 +1127,9 @@ class SaveEditorApp:
             ),
             "photo_mode_independent": bool(
                 self.controller_photo_mode_independent_var.get()
+            ),
+            "fishing_mode_independent": bool(
+                self.controller_fishing_mode_independent_var.get()
             ),
             "keybind": {
                 "helper1": self.helper1_var.get(),
@@ -1054,6 +1182,9 @@ class SaveEditorApp:
         normalized["photo_mode_independent"] = bool(
             normalized.get("photo_mode_independent", False)
         )
+        normalized["fishing_mode_independent"] = bool(
+            normalized.get("fishing_mode_independent", False)
+        )
 
         keybind = normalized.get("keybind")
         if not isinstance(keybind, dict):
@@ -1077,7 +1208,12 @@ class SaveEditorApp:
             CONTROLLER_PHOTO_MODE_LINKS,
             normalized["photo_mode_independent"],
         )
-        # コントローラの釣りモードは常に個別設定のため連動しない。
+        self._normalize_controller_link_group_profile(
+            actions,
+            CONTROLLER_FISHING_MODE_ACTIONS,
+            CONTROLLER_FISHING_MODE_LINKS,
+            normalized["fishing_mode_independent"],
+        )
         return normalized
 
     def _normalize_keymouse_layout_profile(self, profile: dict) -> dict:
@@ -1195,6 +1331,7 @@ class SaveEditorApp:
             "controller_type",
             "quick_wheel_independent",
             "photo_mode_independent",
+            "fishing_mode_independent",
         ):
             if key in overlay_profile:
                 result[key] = copy.deepcopy(overlay_profile[key])
@@ -1371,6 +1508,9 @@ class SaveEditorApp:
         )
         self.controller_photo_mode_independent_var.set(
             bool(profile.get("photo_mode_independent", False))
+        )
+        self.controller_fishing_mode_independent_var.set(
+            bool(profile.get("fishing_mode_independent", False))
         )
 
         self.controller_var.set(controller_type)
@@ -1991,8 +2131,21 @@ class SaveEditorApp:
             )
 
         # 釣りモードのアクション一覧
+        self.controller_fishing_mode_checkbutton = ttk.Checkbutton(
+            self.controller_fishing_action_group,
+            text="釣りモードのアクションを単独で設定する",
+            variable=self.controller_fishing_mode_independent_var,
+        )
+        self.controller_fishing_mode_checkbutton.grid(
+            row=0,
+            column=0,
+            sticky="w",
+            pady=(0, 8),
+        )
+
         for action_row, action in enumerate(
             CONTROLLER_FISHING_MODE_ACTIONS,
+            start=1,
         ):
             self._add_action_row(
                 self.controller_fishing_action_group,
@@ -2288,6 +2441,10 @@ class SaveEditorApp:
         self.keymouse_photo_mode_independent_var.trace_add(
             "write",
             self._on_keymouse_photo_mode_independent_changed,
+        )
+        self.controller_fishing_mode_independent_var.trace_add(
+            "write",
+            self._on_controller_fishing_mode_independent_changed,
         )
         self.keymouse_fishing_mode_independent_var.trace_add(
             "write",
@@ -2621,11 +2778,10 @@ class SaveEditorApp:
             CONTROLLER_PHOTO_MODE_LINKS,
             bool(self.controller_photo_mode_independent_var.get()),
         )
-        # コントローラの釣りモードには単独設定チェックがないため、常に個別編集。
         self._sync_controller_link_group(
             CONTROLLER_FISHING_MODE_ACTIONS,
             CONTROLLER_FISHING_MODE_LINKS,
-            True,
+            bool(self.controller_fishing_mode_independent_var.get()),
         )
 
     def _restore_controller_linked_actions_from_client(
@@ -2742,6 +2898,13 @@ class SaveEditorApp:
             KEYMOUSE_PHOTO_MODE_LINKS,
         )
 
+    def _on_controller_fishing_mode_independent_changed(self, *args):
+        self._on_controller_independent_changed(
+            self.controller_fishing_mode_independent_var,
+            CONTROLLER_FISHING_MODE_ACTIONS,
+            CONTROLLER_FISHING_MODE_LINKS,
+        )
+
     def _on_keymouse_fishing_mode_independent_changed(self, *args):
         self._on_keymouse_independent_changed(
             self.keymouse_fishing_mode_independent_var,
@@ -2749,112 +2912,106 @@ class SaveEditorApp:
             KEYMOUSE_FISHING_MODE_LINKS,
         )
 
-    def get_input_offsets(self, action: dict, dec: Optional[bytes] = None) -> list[int]:
-        """
-        ゲームパッド側のBKRInputConfigData相対value位置を返す。
-
-        UU1では一部だけキーボード/マウスと並びが入れ替わるため、
-        lodef位置とUU1候補のどちらが controller record かをtypeで判定する。
-        """
-        if self.input_anchor_pos is None:
-            raise ValueError("入力設定が読み込まれていません。")
-
-        rel_candidates = list(action["rel_offsets"])
-        for rel in ACTION_CONTROLLER_OFFSET_ALIASES.get(action["id"], []):
-            if rel not in rel_candidates:
-                rel_candidates.append(rel)
-
-        abs_candidates = [self.input_anchor_pos + rel for rel in rel_candidates]
-
-        if dec is None:
-            return abs_candidates
-
-        resolved = [
-            off for off in abs_candidates
-            if self._is_standard_action_record(dec, off)
-        ]
-        if resolved:
-            return resolved
-
-        return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
-
-    def get_keymouse_input_offsets(self, action: dict, dec: Optional[bytes] = None) -> list[int]:
-        """
-        キーボード/マウス側のBKRInputConfigData相対value位置を返す。
-
-        type=0x01/0x02のレコードだけを採用するため、UU1の入れ替わり位置も
-        lodef / UU1のどちらかへ自動追従する。
-        """
-        if self.input_anchor_pos is None:
-            raise ValueError("入力設定が読み込まれていません。")
-
-        rel_candidates = list(action["rel_offsets"])
-        for rel in ACTION_KEYMOUSE_OFFSET_ALIASES.get(action["id"], []):
-            if rel not in rel_candidates:
-                rel_candidates.append(rel)
-
-        abs_candidates = [self.input_anchor_pos + rel for rel in rel_candidates]
-
-        if dec is None:
-            return abs_candidates
-
-        resolved = [
-            off for off in abs_candidates
-            if self._is_keymouse_action_record(dec, off)
-        ]
-        if resolved:
-            return resolved
-
-        return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
-
-    def _is_standard_action_record(self, dec: bytes, off: int) -> bool:
-        """
-        controller側のアクションレコードか判定する。
-
-        構造:
-          off - 0x04 = type
-          off + 0x00 = value
-          off + 0x04 = state
-          off + 0x08 = third dword
-
-        third dwordは撮影モードの方向入力などで0以外になるため、
-        判定には使わず保存時も変更しない。
-        """
-        if off < 4 or off + 8 > len(dec):
-            return False
-
-        input_type = int.from_bytes(dec[off - 4:off], "little")
-        state_dword = int.from_bytes(dec[off + 4:off + 8], "little")
-
-        return (
-            input_type == INPUT_TYPE_CONTROLLER
-            and state_dword in (
-                ACTION_STATE_SINGLE,
-                ACTION_STATE_HELPER1,
-                ACTION_STATE_HELPER2,
-            )
+    def _get_relative_offsets_for_binding_layout(
+        self,
+        action: dict,
+        layout_rel_offsets: dict[str, dict[str, list[int]]],
+    ) -> list[int]:
+        return _get_binding_layout_rel_offsets(
+            action,
+            self._binding_data_layout,
+            layout_rel_offsets,
         )
 
-    def _is_keymouse_action_record(self, dec: bytes, off: int) -> bool:
-        if off < 4 or off + 4 > len(dec):
+    def get_input_offsets(self, action: dict) -> list[int]:
+        """識別済み配置におけるゲームパッド側の全value位置を返す。"""
+        if self.input_anchor_pos is None:
+            raise ValueError("入力設定が読み込まれていません。")
+
+        rel_offsets = self._get_relative_offsets_for_binding_layout(
+            action,
+            CONTROLLER_BINDING_LAYOUT_REL_OFFSETS,
+        )
+        return [self.input_anchor_pos + rel for rel in rel_offsets]
+
+    def get_keymouse_input_offsets(self, action: dict) -> list[int]:
+        """識別済み配置におけるキーボード/マウス側の全value位置を返す。"""
+        if self.input_anchor_pos is None:
+            raise ValueError("入力設定が読み込まれていません。")
+
+        rel_offsets = self._get_relative_offsets_for_binding_layout(
+            action,
+            KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS,
+        )
+        return [self.input_anchor_pos + rel for rel in rel_offsets]
+
+    def _has_expected_input_type(
+        self,
+        dec: bytes,
+        value_offset: int,
+        expected_types: tuple[int, ...],
+    ) -> bool:
+        if value_offset < 4 or value_offset + 4 > len(dec):
             return False
 
-        input_type = int.from_bytes(dec[off - 4:off], "little")
-        return input_type in (INPUT_TYPE_KEYBOARD, INPUT_TYPE_MOUSE)
+        input_type = int.from_bytes(
+            dec[value_offset - 4:value_offset],
+            "little",
+        )
+        return input_type in expected_types
 
-    def get_writable_input_offsets(self, action: dict, dec: bytes) -> list[int]:
-        return [
-            off
-            for off in self.get_input_offsets(action, dec)
-            if self._is_standard_action_record(dec, off)
-        ]
+    def _score_binding_data_layout(
+        self,
+        dec: bytes,
+        binding_layout: str,
+    ) -> int:
+        """配置全体の一致数を返す。個々の保存先を選別する用途には使わない。"""
+        score = 0
+        for action in ACTIONS:
+            for rel_offset in _get_binding_layout_rel_offsets(
+                action,
+                binding_layout,
+                CONTROLLER_BINDING_LAYOUT_REL_OFFSETS,
+            ):
+                value_offset = self.input_anchor_pos + rel_offset
+                if self._has_expected_input_type(
+                    dec,
+                    value_offset,
+                    (INPUT_TYPE_CONTROLLER,),
+                ):
+                    score += 1
 
-    def get_writable_keymouse_offsets(self, action: dict, dec: bytes) -> list[int]:
-        return [
-            off
-            for off in self.get_keymouse_input_offsets(action, dec)
-            if self._is_keymouse_action_record(dec, off)
-        ]
+        for action in KEYMOUSE_ACTIONS:
+            for rel_offset in _get_binding_layout_rel_offsets(
+                action,
+                binding_layout,
+                KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS,
+            ):
+                value_offset = self.input_anchor_pos + rel_offset
+                if self._has_expected_input_type(
+                    dec,
+                    value_offset,
+                    (INPUT_TYPE_KEYBOARD, INPUT_TYPE_MOUSE),
+                ):
+                    score += 1
+        return score
+
+    def _detect_binding_data_layout(self, dec: bytes) -> str:
+        """入力割り当て全体のtype構成から配置を一度だけ識別する。"""
+        if self.input_anchor_pos is None:
+            raise ValueError("入力設定が読み込まれていません。")
+
+        before_update_score = self._score_binding_data_layout(
+            dec,
+            INPUT_BINDING_LAYOUT_BEFORE_UPDATE,
+        )
+        after_update_score = self._score_binding_data_layout(
+            dec,
+            INPUT_BINDING_LAYOUT_AFTER_UPDATE,
+        )
+        if after_update_score > before_update_score:
+            return INPUT_BINDING_LAYOUT_AFTER_UPDATE
+        return INPUT_BINDING_LAYOUT_BEFORE_UPDATE
 
     def _controller_action_uses_helper(self, action: dict) -> bool:
         if "uses_helper" in action:
@@ -3510,6 +3667,7 @@ class SaveEditorApp:
             dec = brotli.decompress(raw)
 
             self.input_anchor_pos = self.find_anchor(dec, INPUT_ANCHOR)
+            self._binding_data_layout = self._detect_binding_data_layout(dec)
             self.helper1_main_pos, self.helper2_main_pos = self.find_helper_main_offsets(dec)
             preset_anchor_pos = dec.find(PRESET_ANCHOR)
             if preset_anchor_pos >= 0:
@@ -3580,6 +3738,7 @@ class SaveEditorApp:
             self.file_path = None
             self.original_dec = None
             self.path_var.set("")
+            self._binding_data_layout = INPUT_BINDING_LAYOUT_BEFORE_UPDATE
             self.preset_anchor_pos = None
             self.helper1_main_pos = None
             self.helper2_main_pos = None
@@ -3614,7 +3773,7 @@ class SaveEditorApp:
         action_value_to_label = self._get_current_action_value_to_label()
         action_helper_values = self._get_action_helper_display_values()
 
-        offsets = self.get_input_offsets(action, dec)
+        offsets = self.get_input_offsets(action)
         first_off = offsets[0]
         first_value = int.from_bytes(dec[first_off:first_off + 4], "little")
         state_dword = int.from_bytes(dec[first_off + 4:first_off + 8], "little")
@@ -3678,7 +3837,7 @@ class SaveEditorApp:
     def _load_keymouse_action_from_dec(self, action: dict, dec: bytes):
         """1件のキーボード/マウスアクションをbytesからUIへ反映する。"""
         action_id = action["id"]
-        offsets = self.get_keymouse_input_offsets(action, dec)
+        offsets = self.get_keymouse_input_offsets(action)
         first_off = offsets[0]
 
         input_type = int.from_bytes(dec[first_off - 4:first_off], "little")
@@ -3807,7 +3966,8 @@ class SaveEditorApp:
                 state_dword = ACTION_STATE_SINGLE
 
             value = action_label_to_value[selected_label]
-            for off in self.get_writable_input_offsets(action, self.original_dec):
+            for off in self.get_input_offsets(action):
+                dec[off - 4:off] = INPUT_TYPE_CONTROLLER.to_bytes(4, "little")
                 dec[off:off + 4] = value.to_bytes(4, "little")
                 dec[off + 4:off + 8] = state_dword.to_bytes(4, "little")
 
@@ -3834,7 +3994,7 @@ class SaveEditorApp:
                 raise ValueError(f"{action['name']} のキーが不正です。")
 
             input_type, value = record
-            for off in self.get_writable_keymouse_offsets(action, self.original_dec):
+            for off in self.get_keymouse_input_offsets(action):
                 dec[off - 4:off] = input_type.to_bytes(4, "little")
                 dec[off:off + 4] = value.to_bytes(4, "little")
 

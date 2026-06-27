@@ -1,10 +1,11 @@
 {
   "version": 6,
-  "input_device": "キーボード/マウス",
+  "input_device": "PlayStation",
   "controller_profile": {
     "controller_type": "PlayStation",
     "quick_wheel_independent": false,
     "photo_mode_independent": false,
+    "fishing_mode_independent": false,
     "keybind": {
       "helper1": "L1",
       "helper2": "R1",
@@ -394,6 +395,10 @@
       "fishing:メニューを閉じる": {
         "helper": "割り当てなし",
         "button": "×"
+      },
+      "fishing:ソーシャルモード": {
+        "helper": "割り当てなし",
+        "button": "touchpad"
       }
     }
   },
@@ -785,6 +790,9 @@
       },
       "fishing:メニューを閉じる": {
         "key": "Esc"
+      },
+      "fishing:ソーシャルモード": {
+        "key": "T"
       },
       "fishing:トーク": {
         "key": "Enter"
