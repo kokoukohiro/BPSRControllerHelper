@@ -49,7 +49,6 @@ BUTTON_LAYOUT_FILE_NAME = "bpsr_controller_helper_config.json"
 
 CONTROLLER_OPTIONS = ["PlayStation", "Nintendo", "Xbox"]
 KEYMOUSE_DEVICE = "キーボード/マウス"
-INPUT_DEVICE_OPTIONS = [*CONTROLLER_OPTIONS]
 DEFAULT_CONTROLLER = "PlayStation"
 
 CONTROLLER_DISPLAY_MAPS = {
@@ -639,13 +638,6 @@ SERVER_PROFILE_ASIA = "asia"
 SERVER_PROFILE_GLOBAL = "global"
 SERVER_PROFILE_TAIWAN = "taiwan"
 
-SERVER_PROFILE_DISPLAY_NAMES = {
-    SERVER_PROFILE_CHINA: "中国サーバー",
-    SERVER_PROFILE_ASIA: "ASIAサーバー",
-    SERVER_PROFILE_GLOBAL: "グローバルサーバー",
-    SERVER_PROFILE_TAIWAN: "台湾サーバー",
-}
-
 # `Star` は StarASIA / StarTW にも含まれるため、固有名を先に判定する。
 SERVER_PROFILE_FOLDER_MARKERS = (
     ("starasia", SERVER_PROFILE_ASIA),
@@ -668,23 +660,28 @@ ASIA_KEYMOUSE_REL_OFFSET_OVERRIDES = {
     _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
 }
 
-SERVER_PROFILES = {
-    SERVER_PROFILE_CHINA: {
+def _make_base_server_profile() -> dict:
+    return {
         "controller_rel_offsets": {},
         "keymouse_rel_offsets": {},
-    },
+    }
+
+
+SERVER_PROFILES = {
+    SERVER_PROFILE_CHINA: _make_base_server_profile(),
     SERVER_PROFILE_ASIA: {
         "controller_rel_offsets": ASIA_CONTROLLER_REL_OFFSET_OVERRIDES,
         "keymouse_rel_offsets": ASIA_KEYMOUSE_REL_OFFSET_OVERRIDES,
     },
-    SERVER_PROFILE_GLOBAL: {
-        "controller_rel_offsets": {},
-        "keymouse_rel_offsets": {},
-    },
-    SERVER_PROFILE_TAIWAN: {
-        "controller_rel_offsets": {},
-        "keymouse_rel_offsets": {},
-    },
+    SERVER_PROFILE_GLOBAL: _make_base_server_profile(),
+    SERVER_PROFILE_TAIWAN: _make_base_server_profile(),
+}
+
+ACTION_GROUP_DISPLAY_NAMES = {
+    ACTION_GROUP_MAIN: "通常",
+    ACTION_GROUP_QUICK_WHEEL: "クイックホイール",
+    ACTION_GROUP_PHOTO: "撮影モード",
+    ACTION_GROUP_FISHING: "釣りモード",
 }
 
 
@@ -1077,12 +1074,12 @@ class SaveEditorApp:
 
     def _append_keymouse_combo_value_if_missing(
         self,
-        action_name: str,
+        action_id: str,
         label: str,
         input_type: int,
         value: int,
     ):
-        combo = self.keymouse_comboboxes.get(action_name)
+        combo = self.keymouse_comboboxes.get(action_id)
         if combo is None or not label:
             return
         self._append_combo_value_if_missing(combo, label)
@@ -1919,7 +1916,7 @@ class SaveEditorApp:
         self.controller_combobox = ttk.Combobox(
             input_device_row,
             textvariable=self.controller_var,
-            values=INPUT_DEVICE_OPTIONS,
+            values=CONTROLLER_OPTIONS,
             state="readonly",
             justify="left",
         )
@@ -2229,15 +2226,15 @@ class SaveEditorApp:
             self.root.after_cancel(self._dropdown_watch_job)
             self._dropdown_watch_job = None
 
-    def _on_combobox_mousewheel(self, event):
-        if self._combobox_dropdown_open:
+    def _scroll_canvas(self, units: int):
+        if self._combobox_dropdown_open or not self._can_scroll_vertical():
             return "break"
-
-        if not self._can_scroll_vertical():
-            return "break"
-
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        if self.canvas.winfo_exists():
+            self.canvas.yview_scroll(units, "units")
         return "break"
+
+    def _on_combobox_mousewheel(self, event):
+        return self._scroll_canvas(int(-event.delta / 120))
 
     def _add_top_combo_row(
         self,
@@ -2430,42 +2427,12 @@ class SaveEditorApp:
             var.trace_add("write", self._on_any_value_changed)
 
     def _bind_mousewheel(self):
-        def _on_mousewheel(event):
-            # Combobox のドロップダウンが開いている間は、親画面をスクロールしない
-            if self._combobox_dropdown_open:
-                return "break"
-
-            if not self._can_scroll_vertical():
-                return "break"
-            if self.canvas.winfo_exists():
-                self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-                return "break"
-
-        def _on_mousewheel_linux_up(event):
-            # Combobox のドロップダウンが開いている間は、親画面をスクロールしない
-            if self._combobox_dropdown_open:
-                return "break"
-
-            if not self._can_scroll_vertical():
-                return "break"
-            if self.canvas.winfo_exists():
-                self.canvas.yview_scroll(-1, "units")
-                return "break"
-
-        def _on_mousewheel_linux_down(event):
-            # Combobox のドロップダウンが開いている間は、親画面をスクロールしない
-            if self._combobox_dropdown_open:
-                return "break"
-
-            if not self._can_scroll_vertical():
-                return "break"
-            if self.canvas.winfo_exists():
-                self.canvas.yview_scroll(1, "units")
-                return "break"
-
-        self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        self.canvas.bind_all("<Button-4>", _on_mousewheel_linux_up)
-        self.canvas.bind_all("<Button-5>", _on_mousewheel_linux_down)
+        self.canvas.bind_all(
+            "<MouseWheel>",
+            lambda event: self._scroll_canvas(int(-event.delta / 120)),
+        )
+        self.canvas.bind_all("<Button-4>", lambda event: self._scroll_canvas(-1))
+        self.canvas.bind_all("<Button-5>", lambda event: self._scroll_canvas(1))
 
     def _bind_clear_selection_click(self):
         self.root.bind_all("<Button-1>", self._on_global_left_click, add="+")
@@ -2636,81 +2603,46 @@ class SaveEditorApp:
                 self.controller_combobox.configure(state="readonly")
 
 
-    def _set_controller_action_controls_enabled(
+    def _set_action_controls_enabled(
         self,
-        action_name: str,
+        controls_by_action: dict[str, list[ttk.Combobox]],
+        action_id: str,
         enabled: bool,
     ):
         state = "readonly" if enabled else "disabled"
-        for combo in self.controller_action_control_widgets.get(action_name, []):
+        for combo in controls_by_action.get(action_id, []):
             combo.configure(state=state)
 
-    def _set_keymouse_action_controls_enabled(
-        self,
-        action_name: str,
-        enabled: bool,
-    ):
-        state = "readonly" if enabled else "disabled"
-        for combo in self.keymouse_action_control_widgets.get(action_name, []):
-            combo.configure(state=state)
-
-    def _sync_controller_link_group(
+    def _sync_link_group(
         self,
         mode_actions: list[dict],
         mode_links: dict[str, str],
         independent: bool,
+        action_vars: dict[str, tk.StringVar],
+        controls_by_action: dict[str, list[ttk.Combobox]],
+        helper_vars: Optional[dict[str, tk.StringVar]] = None,
     ):
-        """チェック状態に合わせ、対応するゲームパッド側の項目だけを同期・無効化する。"""
+        """単独設定状態に合わせ、対応アクションを同期して編集可否を更新する。"""
         previous_suspend = self._suspend_events
         self._suspend_events = True
         try:
             for action in mode_actions:
                 mode_id = action["id"]
                 source_id = mode_links.get(mode_id)
-                is_linked = source_id in self.combo_vars
+                is_linked = source_id in action_vars
 
-                # 単独設定がオフなら、通常側の値と補助キー状態へ一致させてから無効化する。
                 if not independent and is_linked:
-                    self.combo_vars[mode_id].set(
-                        self.combo_vars[source_id].get()
-                    )
+                    action_vars[mode_id].set(action_vars[source_id].get())
                     if (
-                        self._controller_action_uses_helper(action)
-                        and source_id in self.action_helper_vars
+                        helper_vars is not None
+                        and mode_id in helper_vars
+                        and source_id in helper_vars
+                        and self._controller_action_uses_helper(action)
                     ):
-                        self.action_helper_vars[mode_id].set(
-                            self.action_helper_vars[source_id].get()
-                        )
+                        helper_vars[mode_id].set(helper_vars[source_id].get())
 
-                self._set_controller_action_controls_enabled(
-                    mode_id,
-                    independent or not is_linked,
-                )
-        finally:
-            self._suspend_events = previous_suspend
-
-    def _sync_keymouse_link_group(
-        self,
-        mode_actions: list[dict],
-        mode_links: dict[str, str],
-        independent: bool,
-    ):
-        """チェック状態に合わせ、対応するキーボード/マウス側の項目だけを同期・無効化する。"""
-        previous_suspend = self._suspend_events
-        self._suspend_events = True
-        try:
-            for action in mode_actions:
-                mode_id = action["id"]
-                source_id = mode_links.get(mode_id)
-                is_linked = source_id in self.keymouse_combo_vars
-
-                # 単独設定がオフなら、通常側の値へ一致させてから無効化する。
-                if not independent and is_linked:
-                    self.keymouse_combo_vars[mode_id].set(
-                        self.keymouse_combo_vars[source_id].get()
-                    )
-
-                self._set_keymouse_action_controls_enabled(
+                self._set_action_controls_enabled(
+                    controls_by_action,
                     mode_id,
                     independent or not is_linked,
                 )
@@ -2718,47 +2650,63 @@ class SaveEditorApp:
             self._suspend_events = previous_suspend
 
     def _update_mode_linking(self):
-        """現在表示中の入力方式だけに、単独設定の同期規則を適用する。"""
+        """現在表示中の入力方式に、単独設定の同期規則を適用する。"""
         if self._is_keymouse_mode():
-            self._sync_keymouse_link_group(
+            self._sync_link_group(
                 KEYMOUSE_QUICK_WHEEL_ACTIONS,
                 KEYMOUSE_QUICK_WHEEL_LINKS,
                 bool(self.keymouse_quick_wheel_independent_var.get()),
+                self.keymouse_combo_vars,
+                self.keymouse_action_control_widgets,
             )
-            self._sync_keymouse_link_group(
+            self._sync_link_group(
                 KEYMOUSE_PHOTO_MODE_ACTIONS,
                 KEYMOUSE_PHOTO_MODE_LINKS,
                 bool(self.keymouse_photo_mode_independent_var.get()),
+                self.keymouse_combo_vars,
+                self.keymouse_action_control_widgets,
             )
-            self._sync_keymouse_link_group(
+            self._sync_link_group(
                 KEYMOUSE_FISHING_MODE_ACTIONS,
                 KEYMOUSE_FISHING_MODE_LINKS,
                 bool(self.keymouse_fishing_mode_independent_var.get()),
+                self.keymouse_combo_vars,
+                self.keymouse_action_control_widgets,
             )
             return
 
-        self._sync_controller_link_group(
+        self._sync_link_group(
             CONTROLLER_QUICK_WHEEL_ACTIONS,
             CONTROLLER_QUICK_WHEEL_LINKS,
             bool(self.controller_quick_wheel_independent_var.get()),
+            self.combo_vars,
+            self.controller_action_control_widgets,
+            self.action_helper_vars,
         )
-        self._sync_controller_link_group(
+        self._sync_link_group(
             CONTROLLER_PHOTO_MODE_ACTIONS,
             CONTROLLER_PHOTO_MODE_LINKS,
             bool(self.controller_photo_mode_independent_var.get()),
+            self.combo_vars,
+            self.controller_action_control_widgets,
+            self.action_helper_vars,
         )
-        self._sync_controller_link_group(
+        self._sync_link_group(
             CONTROLLER_FISHING_MODE_ACTIONS,
             CONTROLLER_FISHING_MODE_LINKS,
             bool(self.controller_fishing_mode_independent_var.get()),
+            self.combo_vars,
+            self.controller_action_control_widgets,
+            self.action_helper_vars,
         )
 
-    def _restore_controller_linked_actions_from_client(
+    def _restore_linked_actions_from_client(
         self,
         mode_actions: list[dict],
         mode_links: dict[str, str],
+        load_action,
     ):
-        """グレイアウト解除時、対応していたゲームパッド側の項目だけをbytesから復元する。"""
+        """単独設定を再有効化した項目だけ、読み込み時のbytes値へ戻す。"""
         if self.original_dec is None:
             return
 
@@ -2767,118 +2715,103 @@ class SaveEditorApp:
         try:
             for action in mode_actions:
                 if action["id"] in mode_links:
-                    self._load_controller_action_from_dec(action, self.original_dec)
+                    load_action(action, self.original_dec)
         finally:
             self._suspend_events = previous_suspend
 
-    def _restore_keymouse_linked_actions_from_client(
-        self,
-        mode_actions: list[dict],
-        mode_links: dict[str, str],
-    ):
-        """グレイアウト解除時、対応していたキーボード/マウス側の項目だけをbytesから復元する。"""
-        if self.original_dec is None:
-            return
-
-        previous_suspend = self._suspend_events
-        self._suspend_events = True
-        try:
-            for action in mode_actions:
-                if action["id"] in mode_links:
-                    self._load_keymouse_action_from_dec(action, self.original_dec)
-        finally:
-            self._suspend_events = previous_suspend
-
-    def _on_controller_independent_changed(
+    def _on_mode_independent_changed(
         self,
         independent_var: tk.BooleanVar,
         mode_actions: list[dict],
         mode_links: dict[str, str],
+        action_vars: dict[str, tk.StringVar],
+        controls_by_action: dict[str, list[ttk.Combobox]],
+        load_action,
+        helper_vars: Optional[dict[str, tk.StringVar]] = None,
     ):
         if self._suspend_events:
             return
 
         independent = bool(independent_var.get())
         if independent:
-            # 再チェック時だけ、直前までグレイアウトだった対応項目をクライアント値へ戻す。
-            self._restore_controller_linked_actions_from_client(
+            self._restore_linked_actions_from_client(
                 mode_actions,
                 mode_links,
+                load_action,
             )
 
-        self._sync_controller_link_group(
+        self._sync_link_group(
             mode_actions,
             mode_links,
             independent,
-        )
-        self._cache_current_active_layout_profile()
-        self.update_save_button_state()
-
-    def _on_keymouse_independent_changed(
-        self,
-        independent_var: tk.BooleanVar,
-        mode_actions: list[dict],
-        mode_links: dict[str, str],
-    ):
-        if self._suspend_events:
-            return
-
-        independent = bool(independent_var.get())
-        if independent:
-            # 再チェック時だけ、直前までグレイアウトだった対応項目をクライアント値へ戻す。
-            self._restore_keymouse_linked_actions_from_client(
-                mode_actions,
-                mode_links,
-            )
-
-        self._sync_keymouse_link_group(
-            mode_actions,
-            mode_links,
-            independent,
+            action_vars,
+            controls_by_action,
+            helper_vars,
         )
         self._cache_current_active_layout_profile()
         self.update_save_button_state()
 
     def _on_controller_quick_wheel_independent_changed(self, *args):
-        self._on_controller_independent_changed(
+        self._on_mode_independent_changed(
             self.controller_quick_wheel_independent_var,
             CONTROLLER_QUICK_WHEEL_ACTIONS,
             CONTROLLER_QUICK_WHEEL_LINKS,
+            self.combo_vars,
+            self.controller_action_control_widgets,
+            self._load_controller_action_from_dec,
+            self.action_helper_vars,
         )
 
     def _on_keymouse_quick_wheel_independent_changed(self, *args):
-        self._on_keymouse_independent_changed(
+        self._on_mode_independent_changed(
             self.keymouse_quick_wheel_independent_var,
             KEYMOUSE_QUICK_WHEEL_ACTIONS,
             KEYMOUSE_QUICK_WHEEL_LINKS,
+            self.keymouse_combo_vars,
+            self.keymouse_action_control_widgets,
+            self._load_keymouse_action_from_dec,
         )
 
     def _on_controller_photo_mode_independent_changed(self, *args):
-        self._on_controller_independent_changed(
+        self._on_mode_independent_changed(
             self.controller_photo_mode_independent_var,
             CONTROLLER_PHOTO_MODE_ACTIONS,
             CONTROLLER_PHOTO_MODE_LINKS,
+            self.combo_vars,
+            self.controller_action_control_widgets,
+            self._load_controller_action_from_dec,
+            self.action_helper_vars,
         )
 
     def _on_keymouse_photo_mode_independent_changed(self, *args):
-        self._on_keymouse_independent_changed(
+        self._on_mode_independent_changed(
             self.keymouse_photo_mode_independent_var,
             KEYMOUSE_PHOTO_MODE_ACTIONS,
             KEYMOUSE_PHOTO_MODE_LINKS,
+            self.keymouse_combo_vars,
+            self.keymouse_action_control_widgets,
+            self._load_keymouse_action_from_dec,
         )
 
     def _on_controller_fishing_mode_independent_changed(self, *args):
-        self._on_controller_independent_changed(
+        self._on_mode_independent_changed(
             self.controller_fishing_mode_independent_var,
             CONTROLLER_FISHING_MODE_ACTIONS,
             CONTROLLER_FISHING_MODE_LINKS,
+            self.combo_vars,
+            self.controller_action_control_widgets,
+            self._load_controller_action_from_dec,
+            self.action_helper_vars,
         )
 
     def _on_keymouse_fishing_mode_independent_changed(self, *args):
-        self._on_keymouse_independent_changed(
+        self._on_mode_independent_changed(
             self.keymouse_fishing_mode_independent_var,
             KEYMOUSE_FISHING_MODE_ACTIONS,
             KEYMOUSE_FISHING_MODE_LINKS,
+            self.keymouse_combo_vars,
+            self.keymouse_action_control_widgets,
+            self._load_keymouse_action_from_dec,
         )
 
     def _get_relative_offsets_for_server_profile(
@@ -2996,12 +2929,6 @@ class SaveEditorApp:
         self,
         invalid_actions: list[dict],
     ) -> str:
-        group_labels = {
-            ACTION_GROUP_MAIN: "通常",
-            ACTION_GROUP_QUICK_WHEEL: "クイックホイール",
-            ACTION_GROUP_PHOTO: "撮影モード",
-            ACTION_GROUP_FISHING: "釣りモード",
-        }
         lines = [
             "キー設定プリセットと、保存可能な項目はゲーム設定ファイルへ保存しました。",
             "以下の項目は不正または未生成の保存先を検出したため書き換えていません。",
@@ -3015,7 +2942,7 @@ class SaveEditorApp:
         ]
 
         for entry in invalid_actions:
-            group_label = group_labels.get(entry["group"], entry["group"])
+            group_label = ACTION_GROUP_DISPLAY_NAMES.get(entry["group"], entry["group"])
             lines.append(f"・{entry['device']}: {group_label} > {entry['name']}")
             for invalid_offset in entry["invalid_offsets"]:
                 rel_offset = invalid_offset["offset"] - self.input_anchor_pos
@@ -3107,30 +3034,6 @@ class SaveEditorApp:
         if self.helper2_main_pos is None:
             raise ValueError("補助キー2の保存位置を特定できません。")
         return self.helper2_main_pos
-
-    def _ensure_combo_has_value(self, action_id: str, label: str):
-        combo = self.comboboxes[action_id]
-        current_values = list(combo["values"])
-        if label not in current_values:
-            current_values.append(label)
-            combo["values"] = current_values
-
-    def _ensure_preset_has_value(self, label: str):
-        if self.preset_combobox is None:
-            return
-        current_values = list(self.preset_combobox["values"])
-        if label not in current_values:
-            current_values.append(label)
-            self.preset_combobox["values"] = current_values
-
-    def _ensure_helper_has_value(self, which: str, label: str):
-        combo = self.helper1_combobox if which == "helper1" else self.helper2_combobox
-        if combo is None:
-            return
-        current_values = list(combo["values"])
-        if label not in current_values:
-            current_values.append(label)
-            combo["values"] = current_values
 
     def _get_current_action_value_to_label(self) -> dict[int, str]:
         controller = self._get_current_controller_type()
@@ -3795,7 +3698,7 @@ class SaveEditorApp:
         label = action_value_to_label.get(first_value)
         if label is None:
             label = "不明"
-            self._ensure_combo_has_value(action_id, label)
+            self._append_combo_value_if_missing(self.comboboxes.get(action_id), label)
 
         if not self._controller_action_uses_helper(action):
             helper_label = ACTION_HELPER_NONE_LABEL
@@ -3824,7 +3727,7 @@ class SaveEditorApp:
             preset_label = preset_value_to_label.get(preset_value)
             if preset_label is None:
                 preset_label = "不明"
-                self._ensure_preset_has_value(preset_label)
+                self._append_combo_value_if_missing(self.preset_combobox, preset_label)
         else:
             preset_label = self._get_default_preset_label()
         self.preset_var.set(preset_label)
@@ -3834,7 +3737,7 @@ class SaveEditorApp:
         helper1_label = helper_value_to_label.get(helper1_value)
         if helper1_label is None:
             helper1_label = "不明"
-            self._ensure_helper_has_value("helper1", helper1_label)
+            self._append_combo_value_if_missing(self.helper1_combobox, helper1_label)
         self.helper1_var.set(helper1_label)
 
         helper2_off = self.get_helper2_main_offset()
@@ -3842,7 +3745,7 @@ class SaveEditorApp:
         helper2_label = helper_value_to_label.get(helper2_value)
         if helper2_label is None:
             helper2_label = "不明"
-            self._ensure_helper_has_value("helper2", helper2_label)
+            self._append_combo_value_if_missing(self.helper2_combobox, helper2_label)
         self.helper2_var.set(helper2_label)
 
         for action in ACTIONS:
