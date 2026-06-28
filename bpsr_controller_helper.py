@@ -231,7 +231,7 @@ CONTROLLER_MAIN_ACTIONS = [
     _make_action(ACTION_GROUP_MAIN, 'ジャンプ', [0x00133]),
     _make_action(ACTION_GROUP_MAIN, 'ダッシュ/回避', [0x001C7]),
     _make_action(ACTION_GROUP_MAIN, '環境共鳴能力1', [0x00204]),
-    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力2', [0x00227]),
+    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力2', [0x00241]),
     _make_action(ACTION_GROUP_MAIN, '通常攻撃', [0x0027E]),
     _make_action(ACTION_GROUP_MAIN, '特殊攻撃', [0x009E7]),
     _make_action(ACTION_GROUP_MAIN, 'マスタリースキル1', [0x002D5]),
@@ -244,7 +244,7 @@ CONTROLLER_MAIN_ACTIONS = [
     _make_action(ACTION_GROUP_MAIN, '左でアイテム切り替え', [0x0102D]),
     _make_action(ACTION_GROUP_MAIN, 'アイテム使用', [0x003C9]),
     _make_action(ACTION_GROUP_MAIN, '右でアイテム切り替え', [0x0106A]),
-    _make_action(ACTION_GROUP_MAIN, 'アクション', [0x00551, 0x0158F]),
+    _make_action(ACTION_GROUP_MAIN, 'アクション', [0x00551]),
     _make_action(ACTION_GROUP_MAIN, 'ロックオン/切り替え', [0x00406]),
     _make_action(ACTION_GROUP_MAIN, 'エクストラスキル', [0x00A9E]),
     _make_action(ACTION_GROUP_MAIN, 'インタラクト解除', [0x0045D]),
@@ -260,25 +260,25 @@ CONTROLLER_MAIN_ACTIONS = [
     _make_action(ACTION_GROUP_MAIN, 'カーソル移動-左右', [0x01F63]),
     _make_action(ACTION_GROUP_MAIN, '撮影', [0x0076A]),
     _make_action(ACTION_GROUP_MAIN, 'ダンジョン退出', [0x00810]),
-    _make_action(ACTION_GROUP_MAIN, 'アイテムを使用', [0x0090D, 0x0186B]),
+    _make_action(ACTION_GROUP_MAIN, 'アイテムを使用', [0x0090D]),
     _make_action(ACTION_GROUP_MAIN, 'クイック操作', [0x00BA4]),
     _make_action(ACTION_GROUP_MAIN, '乗り物召喚/解除', [0x00B44]),
-    _make_action(ACTION_GROUP_MAIN, '招待承認', [0x00BE1, 0x01A89]),
-    _make_action(ACTION_GROUP_MAIN, '招待拒否', [0x00C1E, 0x01AC6]),
+    _make_action(ACTION_GROUP_MAIN, '招待承認', [0x00BE1]),
+    _make_action(ACTION_GROUP_MAIN, '招待拒否', [0x00C1E]),
     _make_action(ACTION_GROUP_MAIN, 'オートバトル', [0x00CBB]),
     _make_action(ACTION_GROUP_MAIN, 'チャンネル', [0x00C7E]),
     _make_action(ACTION_GROUP_MAIN, 'イラストガイド', [0x00CF8]),
     _make_action(ACTION_GROUP_MAIN, 'クイックホイール', [0x00D35]),
     _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（左）', [0x00FB3]),
-    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（右）', [0x00FD6]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（右）', [0x00FF0]),
     _make_action(ACTION_GROUP_MAIN, 'ズームアウト', [0x0058E]),
     _make_action(ACTION_GROUP_MAIN, 'ズームイン', [0x005A3]),
-    _make_action(ACTION_GROUP_MAIN, 'スキルパレットを開く', [0x01227, 0x01F7D]),
+    _make_action(ACTION_GROUP_MAIN, 'スキルパレットを開く', [0x01227]),
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル1', [0x01133]),
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル2', [0x01170]),
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル3', [0x011AD]),
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル4', [0x011EA]),
-    _make_action(ACTION_GROUP_MAIN, 'ホーム設計図', [0x0124A]),
+    _make_action(ACTION_GROUP_MAIN, 'ホーム設計図', [0x01264]),
 ]
 
 CONTROLLER_QUICK_WHEEL_ACTIONS = [
@@ -469,7 +469,7 @@ KEYMOUSE_MAIN_ACTIONS = [
     _make_action(ACTION_GROUP_MAIN, 'ダッシュ/回避1', [0x00193, 0x013AE]),
     _make_action(ACTION_GROUP_MAIN, 'ダッシュ/回避2', [0x001AD]),
     _make_action(ACTION_GROUP_MAIN, '環境共鳴能力1', [0x001EA, 0x013D1]),
-    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力2', [0x00241]),
+    _make_action(ACTION_GROUP_MAIN, '環境共鳴能力2', [0x00227]),
     _make_action(ACTION_GROUP_MAIN, '通常攻撃', [0x00264], allowed_input_types=[INPUT_TYPE_MOUSE]),
     _make_action(ACTION_GROUP_MAIN, '特殊攻撃', [0x009CD, 0x01934]),
     _make_action(ACTION_GROUP_MAIN, 'マスタリースキル1', [0x002BB, 0x0143A]),
@@ -522,7 +522,7 @@ KEYMOUSE_MAIN_ACTIONS = [
     _make_action(ACTION_GROUP_MAIN, 'クイックホイール', [0x00D1B, 0x01B98]),
     _make_action(ACTION_GROUP_MAIN, 'オートラン', [0x00F39, 0x01D9C]),
     _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（左）', [0x00F99, 0x01DE2]),
-    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（右）', [0x00FF0]),
+    _make_action(ACTION_GROUP_MAIN, 'クエスト切り替え（右）', [0x00FD6]),
     _make_action(ACTION_GROUP_MAIN, 'ホーム編集', [0x00F16, 0x01D79]),
     _make_action(ACTION_GROUP_MAIN, 'ズームアウト/ズームイン', [0x00574, 0x00893, 0x015D5, 0x01814]),
     _make_action(ACTION_GROUP_MAIN, 'スキルパレットを開く', [0x0120D, 0x01F86]),
@@ -530,7 +530,7 @@ KEYMOUSE_MAIN_ACTIONS = [
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル2', [0x01156]),
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル3', [0x01193]),
     _make_action(ACTION_GROUP_MAIN, 'ロールスキル4', [0x011D0]),
-    _make_action(ACTION_GROUP_MAIN, 'ホーム設計図', [0x01264, 0x01FDD]),
+    _make_action(ACTION_GROUP_MAIN, 'ホーム設計図', [0x0124A]),
     _make_action(ACTION_GROUP_MAIN, 'アテンドイマジンを召喚する', [0x01287, 0x02000]),
     _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット1', [0x00D58, 0x01BBB]),
     _make_action(ACTION_GROUP_MAIN, 'クイックホイール-スロット2', [0x00D7B, 0x01BDE]),
@@ -624,138 +624,107 @@ KEYMOUSE_LCTRL_PREFIX_ACTION_IDS = {
 }
 
 # =========================
-# 入力割り当てデータの配置
-# 既知の入力割り当てデータ更新の前後では、一部アクションのゲームパッドと
-# キーボード/マウスの物理スロットが入れ替わる。
+# サーバープロファイル別の入力配置
+# 中国サーバーを現行の基準スキーマにする。
+# ASIA サーバーだけ、Excelで確定した3項目の反転配置を使う。
+# グローバル / 台湾は中国基準をそのまま使う。
 #
-# rel_offsets は解析済みの物理スロットを保持する。複数ある場合は、選択中の
-# 配置で有効な同一アクションの全スロットへ保存する。ただし、同じ物理領域を
-# 別入力方式が使用する配置では、その領域を所有する側だけが保存する。
-# これは既存レコードごとの判定ではなく、設定ファイル全体で一度だけ確定する
-# 配置定義である。
-#
-# 書込み先の既存type/stateは保存可否に使わない。選択された配置の所有スロット
-# であれば、未生成の入力スロットも直接初期化して書き込む。
+# rel_offsets に複数あるアクションは、選択したサーバープロファイルでも
+# 全offsetが同じアクションの保存対象である。存在しない / 未生成の位置は、
+# 保存前の合法性チェックで検出する。1つでも不正なoffsetを含むアクションは
+# 全offsetをまとめてスキップし、ほかの合法なアクションは通常どおり保存する。
 # =========================
-INPUT_BINDING_LAYOUT_BEFORE_UPDATE = "before_binding_update"
-INPUT_BINDING_LAYOUT_AFTER_UPDATE = "after_binding_update"
+SERVER_PROFILE_CHINA = "china"
+SERVER_PROFILE_ASIA = "asia"
+SERVER_PROFILE_GLOBAL = "global"
+SERVER_PROFILE_TAIWAN = "taiwan"
 
-# 5組は、更新前配置ではキーボード/マウス側の後半スロット、更新後配置では
-# ゲームパッド側の後半スロットとして使われる。両方を同時に保存すると3 byte
-# 単位で物理的に重なるため、配置ごとに所有者を固定する。
+SERVER_PROFILE_DISPLAY_NAMES = {
+    SERVER_PROFILE_CHINA: "中国サーバー",
+    SERVER_PROFILE_ASIA: "ASIAサーバー",
+    SERVER_PROFILE_GLOBAL: "グローバルサーバー",
+    SERVER_PROFILE_TAIWAN: "台湾サーバー",
+}
 
-# 各配置で action["rel_offsets"] の代わりに使う完全な物理スロット集合。
-# 辞書にないアクションは rel_offsets 全件をそのまま使う。
-CONTROLLER_BINDING_LAYOUT_REL_OFFSETS = {
-    INPUT_BINDING_LAYOUT_BEFORE_UPDATE: {
-        # 更新前は後半位置がキーボード/マウス側に属するため、前半の
-        # ゲームパッドスロットだけを使う。
-        _make_action_id(ACTION_GROUP_MAIN, "アクション"): [0x00551],
-        _make_action_id(ACTION_GROUP_MAIN, "アイテムを使用"): [0x0090D],
-        _make_action_id(ACTION_GROUP_MAIN, "招待承認"): [0x00BE1],
-        _make_action_id(ACTION_GROUP_MAIN, "招待拒否"): [0x00C1E],
-        _make_action_id(ACTION_GROUP_MAIN, "スキルパレットを開く"): [0x01227],
+# `Star` は StarASIA / StarTW にも含まれるため、固有名を先に判定する。
+SERVER_PROFILE_FOLDER_MARKERS = (
+    ("starasia", SERVER_PROFILE_ASIA),
+    ("startw", SERVER_PROFILE_TAIWAN),
+    ("bpsr", SERVER_PROFILE_GLOBAL),
+    ("star", SERVER_PROFILE_CHINA),
+)
+
+# 中国を基準にした、ASIAだけの確定済み反転位置。
+# 辞書にないアクションは action["rel_offsets"] を全件使用する。
+ASIA_CONTROLLER_REL_OFFSET_OVERRIDES = {
+    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00227],
+    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FD6],
+    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x0124A],
+}
+
+ASIA_KEYMOUSE_REL_OFFSET_OVERRIDES = {
+    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00241],
+    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FF0],
+    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
+}
+
+SERVER_PROFILES = {
+    SERVER_PROFILE_CHINA: {
+        "controller_rel_offsets": {},
+        "keymouse_rel_offsets": {},
     },
-    INPUT_BINDING_LAYOUT_AFTER_UPDATE: {
-        _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00241],
-        _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FF0],
-        _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
+    SERVER_PROFILE_ASIA: {
+        "controller_rel_offsets": ASIA_CONTROLLER_REL_OFFSET_OVERRIDES,
+        "keymouse_rel_offsets": ASIA_KEYMOUSE_REL_OFFSET_OVERRIDES,
+    },
+    SERVER_PROFILE_GLOBAL: {
+        "controller_rel_offsets": {},
+        "keymouse_rel_offsets": {},
+    },
+    SERVER_PROFILE_TAIWAN: {
+        "controller_rel_offsets": {},
+        "keymouse_rel_offsets": {},
     },
 }
 
-KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS = {
-    INPUT_BINDING_LAYOUT_BEFORE_UPDATE: {
-        # この位置は更新前のゲームパッドレコードと重なるため、キーボード/
-        # マウス側のホーム設計図は先頭位置だけを使う。
-        _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
-    },
-    INPUT_BINDING_LAYOUT_AFTER_UPDATE: {
-        _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00227],
-        _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FD6],
-        _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x0124A],
-        # 更新後は後半位置がゲームパッド側の同一アクションへ移るため、
-        # キーボード/マウス側は前半スロットだけを使う。
-        _make_action_id(ACTION_GROUP_MAIN, "アクション"): [0x00537],
-        _make_action_id(ACTION_GROUP_MAIN, "アイテムを使用"): [0x008F3],
-        _make_action_id(ACTION_GROUP_MAIN, "招待承認"): [0x00BC7],
-        _make_action_id(ACTION_GROUP_MAIN, "招待拒否"): [0x00C04],
-        _make_action_id(ACTION_GROUP_MAIN, "スキルパレットを開く"): [0x0120D],
-    },
-}
+
+def _get_server_profile_definition(server_profile_id: str) -> dict:
+    profile = SERVER_PROFILES.get(server_profile_id)
+    if not isinstance(profile, dict):
+        raise ValueError("対応するサーバープロファイルを特定できません。")
+    return profile
 
 
-def _get_binding_layout_rel_offsets(
+def _get_server_profile_rel_offsets(
     action: dict,
-    binding_layout: str,
-    layout_rel_offsets: dict[str, dict[str, list[int]]],
-) -> list[int]:
-    layout_overrides = layout_rel_offsets[binding_layout]
-    return list(layout_overrides.get(action["id"], action["rel_offsets"]))
-
-
-def _iter_binding_write_ranges(
-    actions: list[dict],
-    binding_layout: str,
-    layout_rel_offsets: dict[str, dict[str, list[int]]],
+    server_profile_id: str,
     *,
     controller: bool,
-):
-    for action in actions:
-        for rel_offset in _get_binding_layout_rel_offsets(
-            action,
-            binding_layout,
-            layout_rel_offsets,
-        ):
-            # ゲームパッドは type + value + state、キーボード/マウスは
-            # type + value を初期化する。
-            start = rel_offset - 4
-            end = rel_offset + 8 if controller else rel_offset + 4
-            yield start, end, action["id"], rel_offset
+) -> list[int]:
+    profile = _get_server_profile_definition(server_profile_id)
+    key = "controller_rel_offsets" if controller else "keymouse_rel_offsets"
+    overrides = profile[key]
+    return list(overrides.get(action["id"], action["rel_offsets"]))
 
 
-def _validate_binding_layout_slot_ownership():
-    """各配置で、保存対象の物理書込み範囲が重ならないことを検証する。"""
-    for binding_layout in (
-        INPUT_BINDING_LAYOUT_BEFORE_UPDATE,
-        INPUT_BINDING_LAYOUT_AFTER_UPDATE,
-    ):
-        write_ranges = [
-            *(
-                (start, end, "controller", action_id, rel_offset)
-                for start, end, action_id, rel_offset in _iter_binding_write_ranges(
-                    ACTIONS,
-                    binding_layout,
-                    CONTROLLER_BINDING_LAYOUT_REL_OFFSETS,
-                    controller=True,
-                )
-            ),
-            *(
-                (start, end, "keymouse", action_id, rel_offset)
-                for start, end, action_id, rel_offset in _iter_binding_write_ranges(
-                    KEYMOUSE_ACTIONS,
-                    binding_layout,
-                    KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS,
-                    controller=False,
-                )
-            ),
-        ]
+def _detect_server_profile_id_from_file_path(file_path: Path) -> Optional[str]:
+    """bokura直下のサーバーフォルダ名から、保存規則を一意に選ぶ。"""
+    try:
+        parts = file_path.expanduser().resolve().parts
+    except OSError:
+        parts = file_path.expanduser().parts
 
-        for index, current in enumerate(write_ranges):
-            current_start, current_end, current_device, current_action_id, current_rel = current
-            for other in write_ranges[index + 1:]:
-                other_start, other_end, other_device, other_action_id, other_rel = other
-                if max(current_start, other_start) >= min(current_end, other_end):
-                    continue
-                raise RuntimeError(
-                    "入力割り当ての書込み範囲が重複しています: "
-                    f"{binding_layout} / "
-                    f"{current_device}:{current_action_id}@0x{current_rel:05X} / "
-                    f"{other_device}:{other_action_id}@0x{other_rel:05X}"
-                )
+    for index, part in enumerate(parts[:-1]):
+        if part.casefold() != "bokura" or index + 1 >= len(parts):
+            continue
 
+        server_folder_name = parts[index + 1].casefold()
+        for marker, server_profile_id in SERVER_PROFILE_FOLDER_MARKERS:
+            if marker in server_folder_name:
+                return server_profile_id
+        return None
 
-_validate_binding_layout_slot_ownership()
-
+    return None
 
 # =========================
 # 撮影モード / 釣りモードの連動
@@ -950,8 +919,8 @@ class SaveEditorApp:
         self.original_dec: Optional[bytes] = None
 
         self.input_anchor_pos: Optional[int] = None
-        # 設定ファイル読込時に一度だけ識別し、以後の読込・保存で共通に使う。
-        self._binding_data_layout = INPUT_BINDING_LAYOUT_BEFORE_UPDATE
+        # 保存パスのサーバーフォルダ名から一度だけ識別し、以後の読込・保存で共通に使う。
+        self._server_profile_id: Optional[str] = None
         self.preset_anchor_pos: Optional[int] = None
         self.helper1_main_pos: Optional[int] = None
         self.helper2_main_pos: Optional[int] = None
@@ -2912,106 +2881,149 @@ class SaveEditorApp:
             KEYMOUSE_FISHING_MODE_LINKS,
         )
 
-    def _get_relative_offsets_for_binding_layout(
+    def _get_relative_offsets_for_server_profile(
         self,
         action: dict,
-        layout_rel_offsets: dict[str, dict[str, list[int]]],
+        *,
+        controller: bool,
     ) -> list[int]:
-        return _get_binding_layout_rel_offsets(
+        if self._server_profile_id is None:
+            raise ValueError("対応するサーバープロファイルを特定できません。")
+        return _get_server_profile_rel_offsets(
             action,
-            self._binding_data_layout,
-            layout_rel_offsets,
+            self._server_profile_id,
+            controller=controller,
         )
 
     def get_input_offsets(self, action: dict) -> list[int]:
-        """識別済み配置におけるゲームパッド側の全value位置を返す。"""
+        """選択サーバーにおけるゲームパッド側の全value位置を返す。"""
         if self.input_anchor_pos is None:
             raise ValueError("入力設定が読み込まれていません。")
 
-        rel_offsets = self._get_relative_offsets_for_binding_layout(
+        rel_offsets = self._get_relative_offsets_for_server_profile(
             action,
-            CONTROLLER_BINDING_LAYOUT_REL_OFFSETS,
+            controller=True,
         )
         return [self.input_anchor_pos + rel for rel in rel_offsets]
 
     def get_keymouse_input_offsets(self, action: dict) -> list[int]:
-        """識別済み配置におけるキーボード/マウス側の全value位置を返す。"""
+        """選択サーバーにおけるキーボード/マウス側の全value位置を返す。"""
         if self.input_anchor_pos is None:
             raise ValueError("入力設定が読み込まれていません。")
 
-        rel_offsets = self._get_relative_offsets_for_binding_layout(
+        rel_offsets = self._get_relative_offsets_for_server_profile(
             action,
-            KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS,
+            controller=False,
         )
         return [self.input_anchor_pos + rel for rel in rel_offsets]
 
-    def _has_expected_input_type(
-        self,
-        dec: bytes,
-        value_offset: int,
-        expected_types: tuple[int, ...],
-    ) -> bool:
-        if value_offset < 4 or value_offset + 4 > len(dec):
+    def _is_standard_action_record(self, dec: bytes, off: int) -> bool:
+        """ゲームパッドの既存入力レコードかを、typeとstateで確認する。"""
+        if off < 4 or off + 8 > len(dec):
             return False
 
-        input_type = int.from_bytes(
-            dec[value_offset - 4:value_offset],
-            "little",
+        input_type = int.from_bytes(dec[off - 4:off], "little")
+        state_dword = int.from_bytes(dec[off + 4:off + 8], "little")
+        return (
+            input_type == INPUT_TYPE_CONTROLLER
+            and state_dword in (
+                ACTION_STATE_SINGLE,
+                ACTION_STATE_HELPER1,
+                ACTION_STATE_HELPER2,
+            )
         )
-        return input_type in expected_types
 
-    def _score_binding_data_layout(
+    def _is_keymouse_action_record(self, dec: bytes, off: int) -> bool:
+        """キーボード/マウスの既存入力レコードかをtypeで確認する。"""
+        if off < 4 or off + 4 > len(dec):
+            return False
+
+        input_type = int.from_bytes(dec[off - 4:off], "little")
+        return input_type in (INPUT_TYPE_KEYBOARD, INPUT_TYPE_MOUSE)
+
+    def _describe_action_record(self, dec: bytes, off: int, *, controller: bool) -> str:
+        if off < 4 or off + 4 > len(dec):
+            return "範囲外"
+
+        input_type = int.from_bytes(dec[off - 4:off], "little")
+        if controller and off + 8 <= len(dec):
+            state_dword = int.from_bytes(dec[off + 4:off + 8], "little")
+            return f"type=0x{input_type:08X}, state=0x{state_dword:08X}"
+        return f"type=0x{input_type:08X}"
+
+    def _collect_invalid_write_targets(self, dec: bytes) -> list[dict]:
+        """不正なoffsetを含むアクションを抽出する。複数offsetは1件でも不正なら全件スキップする。"""
+        invalid_actions: list[dict] = []
+
+        for actions, controller, device_label in (
+            (ACTIONS, True, "ゲームパッド"),
+            (KEYMOUSE_ACTIONS, False, "キーボード/マウス"),
+        ):
+            for action in actions:
+                offsets = (
+                    self.get_input_offsets(action)
+                    if controller
+                    else self.get_keymouse_input_offsets(action)
+                )
+                invalid_offsets = [
+                    {
+                        "offset": off,
+                        "detail": self._describe_action_record(
+                            dec,
+                            off,
+                            controller=controller,
+                        ),
+                    }
+                    for off in offsets
+                    if not (
+                        self._is_standard_action_record(dec, off)
+                        if controller
+                        else self._is_keymouse_action_record(dec, off)
+                    )
+                ]
+                if invalid_offsets:
+                    invalid_actions.append({
+                        "action_id": action["id"],
+                        "device": device_label,
+                        "group": action["group"],
+                        "name": action["name"],
+                        "invalid_offsets": invalid_offsets,
+                    })
+
+        return invalid_actions
+
+    def _format_save_target_validation_message(
         self,
-        dec: bytes,
-        binding_layout: str,
-    ) -> int:
-        """配置全体の一致数を返す。個々の保存先を選別する用途には使わない。"""
-        score = 0
-        for action in ACTIONS:
-            for rel_offset in _get_binding_layout_rel_offsets(
-                action,
-                binding_layout,
-                CONTROLLER_BINDING_LAYOUT_REL_OFFSETS,
-            ):
-                value_offset = self.input_anchor_pos + rel_offset
-                if self._has_expected_input_type(
-                    dec,
-                    value_offset,
-                    (INPUT_TYPE_CONTROLLER,),
-                ):
-                    score += 1
+        invalid_actions: list[dict],
+    ) -> str:
+        group_labels = {
+            ACTION_GROUP_MAIN: "通常",
+            ACTION_GROUP_QUICK_WHEEL: "クイックホイール",
+            ACTION_GROUP_PHOTO: "撮影モード",
+            ACTION_GROUP_FISHING: "釣りモード",
+        }
+        lines = [
+            "キー設定プリセットと、保存可能な項目はゲーム設定ファイルへ保存しました。",
+            "以下の項目は不正または未生成の保存先を検出したため書き換えていません。",
+            "",
+            "ゲーム内でキー設定をデフォルトに戻した後、ゲームを完全に終了してください。",
+            "その後、このツールでキー設定プリセットを読み込み、もう一度保存してください。",
+            "",
+            "※このエラーは、ゲーム側の更新で対象項目が実装されるまで解消しない可能性があります。",
+            "",
+            "今回スキップした項目:",
+        ]
 
-        for action in KEYMOUSE_ACTIONS:
-            for rel_offset in _get_binding_layout_rel_offsets(
-                action,
-                binding_layout,
-                KEYMOUSE_BINDING_LAYOUT_REL_OFFSETS,
-            ):
-                value_offset = self.input_anchor_pos + rel_offset
-                if self._has_expected_input_type(
-                    dec,
-                    value_offset,
-                    (INPUT_TYPE_KEYBOARD, INPUT_TYPE_MOUSE),
-                ):
-                    score += 1
-        return score
+        for entry in invalid_actions:
+            group_label = group_labels.get(entry["group"], entry["group"])
+            lines.append(f"・{entry['device']}: {group_label} > {entry['name']}")
+            for invalid_offset in entry["invalid_offsets"]:
+                rel_offset = invalid_offset["offset"] - self.input_anchor_pos
+                lines.append(
+                    f"  +0x{rel_offset:05X}: {invalid_offset['detail']}"
+                )
 
-    def _detect_binding_data_layout(self, dec: bytes) -> str:
-        """入力割り当て全体のtype構成から配置を一度だけ識別する。"""
-        if self.input_anchor_pos is None:
-            raise ValueError("入力設定が読み込まれていません。")
-
-        before_update_score = self._score_binding_data_layout(
-            dec,
-            INPUT_BINDING_LAYOUT_BEFORE_UPDATE,
-        )
-        after_update_score = self._score_binding_data_layout(
-            dec,
-            INPUT_BINDING_LAYOUT_AFTER_UPDATE,
-        )
-        if after_update_score > before_update_score:
-            return INPUT_BINDING_LAYOUT_AFTER_UPDATE
-        return INPUT_BINDING_LAYOUT_BEFORE_UPDATE
+        return "\n".join(lines)
 
     def _controller_action_uses_helper(self, action: dict) -> bool:
         if "uses_helper" in action:
@@ -3667,7 +3679,9 @@ class SaveEditorApp:
             dec = brotli.decompress(raw)
 
             self.input_anchor_pos = self.find_anchor(dec, INPUT_ANCHOR)
-            self._binding_data_layout = self._detect_binding_data_layout(dec)
+            self._server_profile_id = _detect_server_profile_id_from_file_path(file_path)
+            if self._server_profile_id is None:
+                raise ValueError("サーバーフォルダ名から保存規則を特定できません。")
             self.helper1_main_pos, self.helper2_main_pos = self.find_helper_main_offsets(dec)
             preset_anchor_pos = dec.find(PRESET_ANCHOR)
             if preset_anchor_pos >= 0:
@@ -3738,7 +3752,7 @@ class SaveEditorApp:
             self.file_path = None
             self.original_dec = None
             self.path_var.set("")
-            self._binding_data_layout = INPUT_BINDING_LAYOUT_BEFORE_UPDATE
+            self._server_profile_id = None
             self.preset_anchor_pos = None
             self.helper1_main_pos = None
             self.helper2_main_pos = None
@@ -3895,6 +3909,7 @@ class SaveEditorApp:
         self,
         dec: bytearray,
         profile: dict,
+        skipped_action_ids: set[str],
     ):
         controller_type = profile.get("controller_type")
         if controller_type not in CONTROLLER_OPTIONS:
@@ -3949,6 +3964,9 @@ class SaveEditorApp:
 
         for action in ACTIONS:
             action_id = action["id"]
+            if action_id in skipped_action_ids:
+                continue
+
             saved = actions.get(action_id)
             if not isinstance(saved, dict):
                 raise ValueError(f"{action['name']} の保存値がありません。")
@@ -3967,7 +3985,6 @@ class SaveEditorApp:
 
             value = action_label_to_value[selected_label]
             for off in self.get_input_offsets(action):
-                dec[off - 4:off] = INPUT_TYPE_CONTROLLER.to_bytes(4, "little")
                 dec[off:off + 4] = value.to_bytes(4, "little")
                 dec[off + 4:off + 8] = state_dword.to_bytes(4, "little")
 
@@ -3975,6 +3992,7 @@ class SaveEditorApp:
         self,
         dec: bytearray,
         profile: dict,
+        skipped_action_ids: set[str],
     ):
         actions = profile.get("actions")
         if not isinstance(actions, dict):
@@ -3982,6 +4000,9 @@ class SaveEditorApp:
 
         for action in KEYMOUSE_ACTIONS:
             action_id = action["id"]
+            if action_id in skipped_action_ids:
+                continue
+
             saved = actions.get(action_id)
             if not isinstance(saved, dict):
                 raise ValueError(f"{action['name']} の保存値がありません。")
@@ -3998,7 +4019,7 @@ class SaveEditorApp:
                 dec[off - 4:off] = input_type.to_bytes(4, "little")
                 dec[off:off + 4] = value.to_bytes(4, "little")
 
-    def _save_all_profiles(self):
+    def _save_all_profiles(self) -> list[dict]:
         if self.original_dec is None:
             raise ValueError("設定ファイルが読み込まれていません。")
 
@@ -4013,10 +4034,27 @@ class SaveEditorApp:
         self._layout_profile_cache["controller"] = copy.deepcopy(controller_profile)
         self._layout_profile_cache["keymouse"] = copy.deepcopy(keymouse_profile)
 
+        # 一つでも不正なoffsetを含むアクションは、複数offsetを含めて全体を
+        # 書き込まない。ほかの合法なアクション、確認/キャンセル、補助キーは保存する。
+        invalid_actions = self._collect_invalid_write_targets(self.original_dec)
+        skipped_action_ids = {
+            entry["action_id"]
+            for entry in invalid_actions
+        }
+
         dec = bytearray(self.original_dec)
-        self._write_controller_profile_to_dec(dec, controller_profile)
-        self._write_keymouse_profile_to_dec(dec, keymouse_profile)
+        self._write_controller_profile_to_dec(
+            dec,
+            controller_profile,
+            skipped_action_ids,
+        )
+        self._write_keymouse_profile_to_dec(
+            dec,
+            keymouse_profile,
+            skipped_action_ids,
+        )
         self._commit_saved_dec(dec)
+        return invalid_actions
 
     def save_file(self):
         if self.file_path is None or self.original_dec is None:
@@ -4026,9 +4064,21 @@ class SaveEditorApp:
             self.update_save_button_state()
             return
 
+        preset_path: Optional[Path] = None
         try:
-            self._save_all_profiles()
+            # 先に全プロフィールをJSONへ保存する。bytes側の未生成スロットで
+            # 保存を止めても、ユーザーの選択内容は次回に引き継げる。
             preset_path = self._write_button_layout_file()
+            invalid_actions = self._save_all_profiles()
+
+            if invalid_actions:
+                self.base_status_message = "一部のキーをスキップして保存しました"
+                self.update_save_button_state()
+                messagebox.showwarning(
+                    "一部のキーを保存できませんでした",
+                    self._format_save_target_validation_message(invalid_actions),
+                )
+                return
 
             self.base_status_message = "保存しました"
             self.update_save_button_state()
@@ -4042,7 +4092,7 @@ class SaveEditorApp:
             self.update_save_button_state()
             messagebox.showerror(
                 "保存エラー",
-                "保存に失敗しました。入力内容を確認してください。"
+                "キー設定プリセットまたはゲーム設定への保存に失敗しました。入力内容を確認してください。"
             )
 
     def _can_scroll_vertical(self) -> bool:
