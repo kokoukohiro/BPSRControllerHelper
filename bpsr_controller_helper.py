@@ -623,105 +623,14 @@ KEYMOUSE_LCTRL_PREFIX_ACTION_IDS = {
 }
 
 # =========================
-# サーバープロファイル別の入力配置
-# 中国サーバーを現行の基準スキーマにする。
-# ASIA サーバーだけ、Excelで確定した3項目の反転配置を使う。
-# グローバル / 台湾は中国基準をそのまま使う。
-#
-# rel_offsets に複数あるアクションは、選択したサーバープロファイルでも
-# 全offsetが同じアクションの保存対象である。存在しない / 未生成の位置は、
-# 保存前の合法性チェックで検出する。1つでも不正なoffsetを含むアクションは
-# 全offsetをまとめてスキップし、ほかの合法なアクションは通常どおり保存する。
+# 表示名
 # =========================
-SERVER_PROFILE_CHINA = "china"
-SERVER_PROFILE_ASIA = "asia"
-SERVER_PROFILE_GLOBAL = "global"
-SERVER_PROFILE_TAIWAN = "taiwan"
-
-# `Star` は StarASIA / StarTW にも含まれるため、固有名を先に判定する。
-SERVER_PROFILE_FOLDER_MARKERS = (
-    ("starasia", SERVER_PROFILE_ASIA),
-    ("startw", SERVER_PROFILE_TAIWAN),
-    ("bpsr", SERVER_PROFILE_GLOBAL),
-    ("star", SERVER_PROFILE_CHINA),
-)
-
-# 中国を基準にした、ASIAだけの確定済み反転位置。
-# 辞書にないアクションは action["rel_offsets"] を全件使用する。
-ASIA_CONTROLLER_REL_OFFSET_OVERRIDES = {
-    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00227],
-    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FD6],
-    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x0124A],
-}
-
-ASIA_KEYMOUSE_REL_OFFSET_OVERRIDES = {
-    _make_action_id(ACTION_GROUP_MAIN, "環境共鳴能力2"): [0x00241],
-    _make_action_id(ACTION_GROUP_MAIN, "クエスト切り替え（右）"): [0x00FF0],
-    _make_action_id(ACTION_GROUP_MAIN, "ホーム設計図"): [0x01264],
-}
-
-def _make_base_server_profile() -> dict:
-    return {
-        "controller_rel_offsets": {},
-        "keymouse_rel_offsets": {},
-    }
-
-
-SERVER_PROFILES = {
-    SERVER_PROFILE_CHINA: _make_base_server_profile(),
-    SERVER_PROFILE_ASIA: {
-        "controller_rel_offsets": ASIA_CONTROLLER_REL_OFFSET_OVERRIDES,
-        "keymouse_rel_offsets": ASIA_KEYMOUSE_REL_OFFSET_OVERRIDES,
-    },
-    SERVER_PROFILE_GLOBAL: _make_base_server_profile(),
-    SERVER_PROFILE_TAIWAN: _make_base_server_profile(),
-}
-
 ACTION_GROUP_DISPLAY_NAMES = {
     ACTION_GROUP_MAIN: "通常",
     ACTION_GROUP_QUICK_WHEEL: "クイックホイール",
     ACTION_GROUP_PHOTO: "撮影モード",
     ACTION_GROUP_FISHING: "釣りモード",
 }
-
-
-def _get_server_profile_definition(server_profile_id: str) -> dict:
-    profile = SERVER_PROFILES.get(server_profile_id)
-    if not isinstance(profile, dict):
-        raise ValueError("対応するサーバープロファイルを特定できません。")
-    return profile
-
-
-def _get_server_profile_rel_offsets(
-    action: dict,
-    server_profile_id: str,
-    *,
-    controller: bool,
-) -> list[int]:
-    profile = _get_server_profile_definition(server_profile_id)
-    key = "controller_rel_offsets" if controller else "keymouse_rel_offsets"
-    overrides = profile[key]
-    return list(overrides.get(action["id"], action["rel_offsets"]))
-
-
-def _detect_server_profile_id_from_file_path(file_path: Path) -> Optional[str]:
-    """bokura直下のサーバーフォルダ名から、保存規則を一意に選ぶ。"""
-    try:
-        parts = file_path.expanduser().resolve().parts
-    except OSError:
-        parts = file_path.expanduser().parts
-
-    for index, part in enumerate(parts[:-1]):
-        if part.casefold() != "bokura" or index + 1 >= len(parts):
-            continue
-
-        server_folder_name = parts[index + 1].casefold()
-        for marker, server_profile_id in SERVER_PROFILE_FOLDER_MARKERS:
-            if marker in server_folder_name:
-                return server_profile_id
-        return None
-
-    return None
 
 # =========================
 # 撮影モード / 釣りモードの連動
@@ -916,8 +825,6 @@ class SaveEditorApp:
         self.original_dec: Optional[bytes] = None
 
         self.input_anchor_pos: Optional[int] = None
-        # 保存パスのサーバーフォルダ名から一度だけ識別し、以後の読込・保存で共通に使う。
-        self._server_profile_id: Optional[str] = None
         self.preset_anchor_pos: Optional[int] = None
         self.helper1_main_pos: Optional[int] = None
         self.helper2_main_pos: Optional[int] = None
@@ -2814,41 +2721,17 @@ class SaveEditorApp:
             self._load_keymouse_action_from_dec,
         )
 
-    def _get_relative_offsets_for_server_profile(
-        self,
-        action: dict,
-        *,
-        controller: bool,
-    ) -> list[int]:
-        if self._server_profile_id is None:
-            raise ValueError("対応するサーバープロファイルを特定できません。")
-        return _get_server_profile_rel_offsets(
-            action,
-            self._server_profile_id,
-            controller=controller,
-        )
-
     def get_input_offsets(self, action: dict) -> list[int]:
-        """選択サーバーにおけるゲームパッド側の全value位置を返す。"""
+        """ゲームパッド側の全value位置を返す。"""
         if self.input_anchor_pos is None:
             raise ValueError("入力設定が読み込まれていません。")
-
-        rel_offsets = self._get_relative_offsets_for_server_profile(
-            action,
-            controller=True,
-        )
-        return [self.input_anchor_pos + rel for rel in rel_offsets]
+        return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
 
     def get_keymouse_input_offsets(self, action: dict) -> list[int]:
-        """選択サーバーにおけるキーボード/マウス側の全value位置を返す。"""
+        """キーボード/マウス側の全value位置を返す。"""
         if self.input_anchor_pos is None:
             raise ValueError("入力設定が読み込まれていません。")
-
-        rel_offsets = self._get_relative_offsets_for_server_profile(
-            action,
-            controller=False,
-        )
-        return [self.input_anchor_pos + rel for rel in rel_offsets]
+        return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
 
     def _is_standard_action_record(self, dec: bytes, off: int) -> bool:
         """ゲームパッドの既存入力レコードかを、typeとstateで確認する。"""
@@ -3582,9 +3465,6 @@ class SaveEditorApp:
             dec = brotli.decompress(raw)
 
             self.input_anchor_pos = self.find_anchor(dec, INPUT_ANCHOR)
-            self._server_profile_id = _detect_server_profile_id_from_file_path(file_path)
-            if self._server_profile_id is None:
-                raise ValueError("サーバーフォルダ名から保存規則を特定できません。")
             self.helper1_main_pos, self.helper2_main_pos = self.find_helper_main_offsets(dec)
             preset_anchor_pos = dec.find(PRESET_ANCHOR)
             if preset_anchor_pos >= 0:
@@ -3655,7 +3535,6 @@ class SaveEditorApp:
             self.file_path = None
             self.original_dec = None
             self.path_var.set("")
-            self._server_profile_id = None
             self.preset_anchor_pos = None
             self.helper1_main_pos = None
             self.helper2_main_pos = None

@@ -193,12 +193,12 @@
         "button": "share"
       },
       "main:クエスト切り替え（左）": {
-        "helper": "R1",
-        "button": "L2"
+        "helper": "L1",
+        "button": "L前後入力"
       },
       "main:クエスト切り替え（右）": {
-        "helper": "R1",
-        "button": "R2"
+        "helper": "L1",
+        "button": "L左右入力"
       },
       "main:ズームアウト": {
         "helper": "L1",
