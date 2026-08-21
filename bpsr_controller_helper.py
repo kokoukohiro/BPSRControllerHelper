@@ -175,8 +175,6 @@ HELPER_OPTIONS = [
 HELPER_MAIN_VALUES = {value for value, _ in HELPER_OPTIONS}
 
 HELPER_PETWHEEL_ANCHOR = b"PetWheel"
-HELPER1_FROM_PETWHEEL_OFFSET = 0x1B
-HELPER2_FROM_PETWHEEL_OFFSET = 0x1F
 
 # 補助キー本体値 -> アクション側の 1byte 値
 HELPER_MAIN_TO_ACTION_VALUE = {
@@ -348,6 +346,57 @@ INPUT_TYPE_MOUSE = 0x00000002
 INPUT_TYPE_CONTROLLER = 0x00000003
 
 # =========================
+# 入力ブロックアンカー
+# action["rel_offsets"] は既存表との対応を残すため BKRInputConfigData 基準値のまま保持し、
+# 読み書き時はここで定義した明文ブロックアンカーからの相対位置へ変換して使う。
+# =========================
+INPUT_SECTION_PLAY = "play"
+INPUT_SECTION_UI = "ui"
+INPUT_SECTION_TAKE_PHOTO_COMMON = "take_photo_common"
+INPUT_SECTION_EXPRESSION = "expression"
+INPUT_SECTION_FISHING = "fishing"
+INPUT_SECTION_DEFAULT = "default"
+INPUT_SECTION_BAND_PERFORMANCE = "band_performance"
+
+INPUT_SECTION_DEFINITIONS = (
+    (INPUT_SECTION_PLAY, b"Play", 0x00036),
+    (INPUT_SECTION_UI, b"UI", 0x0129C),
+    (INPUT_SECTION_TAKE_PHOTO_COMMON, b"TakePhotoCommon", 0x02015),
+    (INPUT_SECTION_EXPRESSION, b"Expression", 0x02859),
+    (INPUT_SECTION_FISHING, b"Fishing", 0x02940),
+    (INPUT_SECTION_DEFAULT, b"Default", 0x02D03),
+    (INPUT_SECTION_BAND_PERFORMANCE, b"BandPerformance", 0x02D3E),
+)
+INPUT_SECTION_LEGACY_REL_OFFSETS = {
+    section_id: legacy_rel_offset
+    for section_id, _anchor, legacy_rel_offset in INPUT_SECTION_DEFINITIONS
+}
+
+
+def _get_input_section_for_legacy_rel_offset(rel_offset: int) -> str:
+    section_id = INPUT_SECTION_PLAY
+    for candidate_section_id, _anchor, legacy_rel_offset in INPUT_SECTION_DEFINITIONS:
+        if rel_offset >= legacy_rel_offset:
+            section_id = candidate_section_id
+        else:
+            break
+    return section_id
+
+
+def _attach_input_section_offsets(actions: list[dict]):
+    for action in actions:
+        action["input_section_offsets"] = [
+            (
+                _get_input_section_for_legacy_rel_offset(rel_offset),
+                rel_offset - INPUT_SECTION_LEGACY_REL_OFFSETS[
+                    _get_input_section_for_legacy_rel_offset(rel_offset)
+                ],
+            )
+            for rel_offset in action["rel_offsets"]
+        ]
+
+
+# =========================
 # キーボード/マウス用のキー一覧
 # Excel「キー一覧」シートのキーボード / マウスをすべて収録
 # =========================
@@ -438,10 +487,10 @@ KEYMOUSE_OPTIONS = [
     (0x00000002, 0x00000000, 'マウス左クリック'),
     (0x00000002, 0x00000001, 'マウス右クリック'),
     (0x00000002, 0x00000002, 'マウス中央キー'),
-    (0x00000002, 0x00000003, 'マウスボタン3'),
-    (0x00000002, 0x00000004, 'マウスボタン4'),
-    (0x00000002, 0x00000005, 'マウスボタン5'),
-    (0x00000002, 0x00000006, 'マウスボタン6'),
+    (0x00000002, 0x00000003, 'M3'),
+    (0x00000002, 0x00000004, 'M4'),
+    (0x00000002, 0x00000005, 'M5'),
+    (0x00000002, 0x00000006, 'M6'),
     (0x00000002, 0x00000007, 'マウススクロール'),
 ]
 KEYMOUSE_RECORD_TO_LABEL = {
@@ -611,6 +660,9 @@ KEYMOUSE_ACTIONS = [
     *KEYMOUSE_PHOTO_MODE_ACTIONS,
     *KEYMOUSE_FISHING_MODE_ACTIONS,
 ]
+
+_attach_input_section_offsets(ACTIONS)
+_attach_input_section_offsets(KEYMOUSE_ACTIONS)
 
 # これらのキーボード/マウス操作は、ゲーム内では L Ctrl との同時入力として使う。
 KEYMOUSE_LCTRL_PREFIX_ACTION_IDS = {
@@ -825,6 +877,7 @@ class SaveEditorApp:
         self.original_dec: Optional[bytes] = None
 
         self.input_anchor_pos: Optional[int] = None
+        self.input_section_anchor_positions: dict[str, int] = {}
         self.preset_anchor_pos: Optional[int] = None
         self.helper1_main_pos: Optional[int] = None
         self.helper2_main_pos: Optional[int] = None
@@ -2415,6 +2468,22 @@ class SaveEditorApp:
             raise ValueError("必須データが見つかりません。")
         return pos
 
+    def find_input_section_anchor_positions(self, dec: bytes) -> dict[str, int]:
+        if self.input_anchor_pos is None:
+            raise ValueError("入力設定が読み込まれていません。")
+
+        positions: dict[str, int] = {}
+        search_from = self.input_anchor_pos
+
+        for section_id, anchor, _legacy_rel_offset in INPUT_SECTION_DEFINITIONS:
+            pos = dec.find(anchor, search_from)
+            if pos < 0:
+                raise ValueError("入力設定のブロック構造を特定できません。")
+            positions[section_id] = pos
+            search_from = pos + len(anchor)
+
+        return positions
+
     def _get_selected_input_device(self) -> str:
         if self._is_keymouse_mode():
             return KEYMOUSE_DEVICE
@@ -2721,17 +2790,25 @@ class SaveEditorApp:
             self._load_keymouse_action_from_dec,
         )
 
+    def _resolve_action_input_offsets(self, action: dict) -> list[int]:
+        if not self.input_section_anchor_positions:
+            raise ValueError("入力設定のブロック構造が読み込まれていません。")
+
+        offsets: list[int] = []
+        for section_id, section_rel_offset in action.get("input_section_offsets", []):
+            anchor_pos = self.input_section_anchor_positions.get(section_id)
+            if anchor_pos is None:
+                raise ValueError("入力設定のブロック構造を特定できません。")
+            offsets.append(anchor_pos + section_rel_offset)
+        return offsets
+
     def get_input_offsets(self, action: dict) -> list[int]:
         """ゲームパッド側の全value位置を返す。"""
-        if self.input_anchor_pos is None:
-            raise ValueError("入力設定が読み込まれていません。")
-        return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
+        return self._resolve_action_input_offsets(action)
 
     def get_keymouse_input_offsets(self, action: dict) -> list[int]:
         """キーボード/マウス側の全value位置を返す。"""
-        if self.input_anchor_pos is None:
-            raise ValueError("入力設定が読み込まれていません。")
-        return [self.input_anchor_pos + rel for rel in action["rel_offsets"]]
+        return self._resolve_action_input_offsets(action)
 
     def _is_standard_action_record(self, dec: bytes, off: int) -> bool:
         """ゲームパッドの既存入力レコードかを、typeとstateで確認する。"""
@@ -2888,14 +2965,15 @@ class SaveEditorApp:
         return value in HELPER_MAIN_VALUES
 
     def find_helper_main_offsets(self, dec: bytes) -> tuple[int, int]:
-        petwheel_pos = dec.find(HELPER_PETWHEEL_ANCHOR)
+        search_from = self.input_anchor_pos or 0
+        petwheel_pos = dec.find(HELPER_PETWHEEL_ANCHOR, search_from)
         if petwheel_pos < 0:
             raise ValueError("補助キー設定が見つかりません。")
 
-        helper1_off = petwheel_pos + HELPER1_FROM_PETWHEEL_OFFSET
-        helper2_off = petwheel_pos + HELPER2_FROM_PETWHEEL_OFFSET
+        helper1_off = len(dec) - 8
+        helper2_off = len(dec) - 4
 
-        if helper2_off + 4 > len(dec):
+        if helper1_off <= petwheel_pos or helper2_off + 4 > len(dec):
             raise ValueError("補助キー設定が見つかりません。")
 
         helper1_value = int.from_bytes(dec[helper1_off:helper1_off + 4], "little")
@@ -3465,6 +3543,7 @@ class SaveEditorApp:
             dec = brotli.decompress(raw)
 
             self.input_anchor_pos = self.find_anchor(dec, INPUT_ANCHOR)
+            self.input_section_anchor_positions = self.find_input_section_anchor_positions(dec)
             self.helper1_main_pos, self.helper2_main_pos = self.find_helper_main_offsets(dec)
             preset_anchor_pos = dec.find(PRESET_ANCHOR)
             if preset_anchor_pos >= 0:
@@ -3534,6 +3613,8 @@ class SaveEditorApp:
         except Exception:
             self.file_path = None
             self.original_dec = None
+            self.input_anchor_pos = None
+            self.input_section_anchor_positions = {}
             self.path_var.set("")
             self.preset_anchor_pos = None
             self.helper1_main_pos = None
