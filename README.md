@@ -8,7 +8,7 @@ Blue Protocol: Star Resonanceのパッド用ボタン配置を編集するため
 ゲーム内の設定だけでは調整しにくいボタン割り当てを、`localsave.bytes`を直接編集することで変更できます。
 
 2.0.0から[StarResonanceDps](https://github.com/kokoukohiro/StarResonanceDps)のプラグインになりました。単体では動きません。
-単体で動く旧版は[v1.13](https://github.com/kokoukohiro/BPSRControllerHelper/releases/tag/v1.13)です(ソースは`v1.13`フォルダ)。
+単体で動くのは[v1.13](https://github.com/kokoukohiro/BPSRControllerHelper/releases/tag/v1.13)です。
 
 ### 主な機能
 
@@ -35,7 +35,3 @@ StarResonanceDpsを閉じて、`Plugins\KeybindTool\KeybindTool.dll`を新しい
 ### 対応環境
 
 - Windows
-
-### ライセンス
-
-GPL-3.0です。Blue Protocol: Star Resonanceの名前・データ・画像はこのライセンスの対象外で、権利はそれぞれの権利者に属します。
