@@ -4,7 +4,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>KeybindTool</AssemblyName>
+    <AssemblyName>BPSRControllerHelper</AssemblyName>
     <RootNamespace>StarResonanceDps.Plugins.KeybindTool</RootNamespace>
     <GenerateDependencyFile>false</GenerateDependencyFile>
   </PropertyGroup>

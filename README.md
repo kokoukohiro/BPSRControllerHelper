@@ -17,12 +17,12 @@ v2.0.0から[StarResonanceDps](https://github.com/kokoukohiro/StarResonanceDps)�
 
 ### 導入
 
-1. `KeybindTool.dll`をダウンロードします。
-2. StarResonanceDpsの「プラグインを追加」で`KeybindTool.dll`を選びます。
+1. `BPSRControllerHelper.dll`をダウンロードします。
+2. StarResonanceDpsの「プラグインを追加」で`BPSRControllerHelper.dll`を選びます。
 
 ### 更新
 
-新しい`KeybindTool.dll`を「プラグインを追加」で選び、StarResonanceDpsを再起動します。設定はそのまま残ります。
+新しい`BPSRControllerHelper.dll`を「プラグインを追加」で選び、StarResonanceDpsを再起動します。設定はそのまま残ります。
 
 ### 注意事項
 

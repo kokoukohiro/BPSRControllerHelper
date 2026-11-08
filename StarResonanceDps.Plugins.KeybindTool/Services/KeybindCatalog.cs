@@ -1485,7 +1485,7 @@ internal static class KeybindCatalog
     private static KeybindInputVisual CreateAssetVisual(int assetFileName, string? text = null)
     {
         return new KeybindInputVisual(
-            $"pack://application:,,,/KeybindTool;component/Assets/{assetFileName}.png",
+            $"pack://application:,,,/BPSRControllerHelper;component/Assets/{assetFileName}.png",
             text);
     }
 
