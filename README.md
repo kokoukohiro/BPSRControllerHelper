@@ -4,15 +4,16 @@
 [![Downloads](https://img.shields.io/github/downloads/kokoukohiro/BPSRControllerHelper/total.svg)](https://github.com/kokoukohiro/BPSRControllerHelper/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-brightgreen.svg)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
-Blue Protocol: Star Resonanceのパッド用ボタン配置を編集するための非公式ツールです。
-ゲーム内の設定だけでは調整しにくいボタン割り当てを、`localsave.bytes`を直接編集することで変更できます。
+Blue Protocol: Star Resonanceのキー設定を編集するための非公式ツールです。
+`localsave.bytes`を直接編集して、ゲーム内では調整しにくいキーの割り当てを変更できます。
 
-v2.0.0から[StarResonanceDps](https://github.com/kokoukohiro/StarResonanceDps)のプラグインになりました。単体では動きません。
-単体で動くのは[v1.13](https://github.com/kokoukohiro/BPSRControllerHelper/releases/tag/v1.13)です。
+v2.0.0から[StarResonanceDps](https://github.com/kokoukohiro/StarResonanceDps)のプラグインになりました。
+単体で使う場合は[v1.13](https://github.com/kokoukohiro/BPSRControllerHelper/releases/tag/v1.13)を利用してください。
 
 ### 主な機能
 
-- ゲームパッドとキーボード/マウスのボタン配置の編集
+- ゲームパッドとキーボード/マウスのキー設定の編集
+- 日本語・韓国語・中国語・英語に対応
 
 ### 導入
 
@@ -25,8 +26,8 @@ v2.0.0から[StarResonanceDps](https://github.com/kokoukohiro/StarResonanceDps)�
 
 ### 注意事項
 
-- ゲーム起動中にこのツールで`localsave.bytes`を編集しても、変更は反映されません。
-- ボタン配置を編集する際は、**必ずゲームを終了した状態で** 行ってください。
+- ゲームの起動中に編集しても反映されないので、**必ずゲームを終了した状態で** 編集してください。
+- v1.13以前のキー設定プリセットはv2.0.0以降に引き継げません。
 
 ### スクリーンショット
 
