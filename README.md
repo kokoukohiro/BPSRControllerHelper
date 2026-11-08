@@ -13,7 +13,7 @@ v2.0.0から[StarResonanceDps](https://github.com/kokoukohiro/StarResonanceDps)�
 ### 主な機能
 
 - ゲームパッドとキーボード/マウスのキー設定の編集
-- 日本語・韓国語・中国語・英語に対応
+- 日本語/韓国語/中国語/英語に対応
 
 ### 導入
 
