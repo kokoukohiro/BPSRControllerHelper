@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace StarResonanceDps.Plugins.KeybindTool.ViewModels;
+namespace BPSRControllerHelper.ViewModels;
 
 /// <summary>一覧の節の種類。先頭の固定の節(ファイル・プリセット・入力方法・補助キー)と、4つのキー設定の節。</summary>
 internal enum KeybindSectionKind

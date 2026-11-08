@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace StarResonanceDps.Plugins.KeybindTool.Models;
+namespace BPSRControllerHelper.Models;
 
 internal enum KeybindModeGroup
 {

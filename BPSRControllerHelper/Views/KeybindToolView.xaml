@@ -1,7 +1,7 @@
-﻿<UserControl x:Class="StarResonanceDps.Plugins.KeybindTool.Views.KeybindToolView"
+﻿<UserControl x:Class="BPSRControllerHelper.Views.KeybindToolView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:StarResonanceDps.Plugins.KeybindTool.ViewModels"
+             xmlns:viewModels="clr-namespace:BPSRControllerHelper.ViewModels"
              UseLayoutRounding="True"
              SnapsToDevicePixels="True">
     <UserControl.Resources>

@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using StarResonanceDps.Plugins.KeybindTool.Models;
+using BPSRControllerHelper.Models;
 using StarResonanceDps.PluginSdk;
 
-namespace StarResonanceDps.Plugins.KeybindTool.Services;
+namespace BPSRControllerHelper.Services;
 
 internal static class KeybindCatalog
 {

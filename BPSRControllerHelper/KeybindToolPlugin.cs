@@ -1,10 +1,10 @@
 using System.Windows;
 using StarResonanceDps.PluginSdk;
-using StarResonanceDps.Plugins.KeybindTool.ViewModels;
-using StarResonanceDps.Plugins.KeybindTool.Views;
+using BPSRControllerHelper.ViewModels;
+using BPSRControllerHelper.Views;
 
 [assembly: PluginRegistration(
-    typeof(StarResonanceDps.Plugins.KeybindTool.KeybindToolPlugin),
+    typeof(BPSRControllerHelper.KeybindToolPlugin),
     PluginSdkVersion.Current)]
 [assembly: PluginDisplayName("ja-JP", "BPSR：パッド勢を救いたい")]
 [assembly: PluginGenre("ja-JP", "キーバインドツール")]
@@ -15,7 +15,7 @@ using StarResonanceDps.Plugins.KeybindTool.Views;
 [assembly: PluginVersion("2.0.0")]
 [assembly: PluginIcon("Assets/icon.ico")]
 
-namespace StarResonanceDps.Plugins.KeybindTool;
+namespace BPSRControllerHelper;
 
 public sealed class KeybindToolPlugin : IStarResonancePlugin, IPluginWindowProvider
 {

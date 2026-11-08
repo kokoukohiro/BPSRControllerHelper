@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
-using StarResonanceDps.Plugins.KeybindTool.Models;
+using BPSRControllerHelper.Models;
 
-namespace StarResonanceDps.Plugins.KeybindTool.ViewModels;
+namespace BPSRControllerHelper.ViewModels;
 
 internal sealed class ControllerActionRowViewModel : ObservableObject
 {

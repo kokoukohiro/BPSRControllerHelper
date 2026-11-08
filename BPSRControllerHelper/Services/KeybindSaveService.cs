@@ -2,10 +2,10 @@ using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
-using StarResonanceDps.Plugins.KeybindTool.Models;
+using BPSRControllerHelper.Models;
 using StarResonanceDps.PluginSdk;
 
-namespace StarResonanceDps.Plugins.KeybindTool.Services;
+namespace BPSRControllerHelper.Services;
 
 internal sealed class KeybindSaveService
 {

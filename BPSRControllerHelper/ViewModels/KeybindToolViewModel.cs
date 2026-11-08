@@ -3,10 +3,10 @@ using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
 using StarResonanceDps.PluginSdk;
-using StarResonanceDps.Plugins.KeybindTool.Models;
-using StarResonanceDps.Plugins.KeybindTool.Services;
+using BPSRControllerHelper.Models;
+using BPSRControllerHelper.Services;
 
-namespace StarResonanceDps.Plugins.KeybindTool.ViewModels;
+namespace BPSRControllerHelper.ViewModels;
 
 internal sealed class KeybindToolViewModel : ObservableObject, IDisposable
 {
@@ -54,7 +54,7 @@ internal sealed class KeybindToolViewModel : ObservableObject, IDisposable
         _texts = new PluginLocalizer(
             _context.Localization,
             typeof(KeybindToolViewModel).Assembly,
-            "StarResonanceDps.Plugins.KeybindTool.Properties.Resources");
+            "BPSRControllerHelper.Properties.Resources");
         _texts.CultureChanged += Texts_CultureChanged;
         _saveService = new KeybindSaveService(_texts);
 

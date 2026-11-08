@@ -4,8 +4,6 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>BPSRControllerHelper</AssemblyName>
-    <RootNamespace>StarResonanceDps.Plugins.KeybindTool</RootNamespace>
     <GenerateDependencyFile>false</GenerateDependencyFile>
   </PropertyGroup>
   <ItemGroup>
@@ -25,19 +23,19 @@
   <ItemGroup>
     <EmbeddedResource Update="Properties\Resources.resx">
       <WithCulture>false</WithCulture>
-      <LogicalName>StarResonanceDps.Plugins.KeybindTool.Properties.Resources.resources</LogicalName>
+      <LogicalName>BPSRControllerHelper.Properties.Resources.resources</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Update="Properties\Resources.ja-JP.resx">
       <WithCulture>false</WithCulture>
-      <LogicalName>StarResonanceDps.Plugins.KeybindTool.Properties.Resources.ja-JP.resources</LogicalName>
+      <LogicalName>BPSRControllerHelper.Properties.Resources.ja-JP.resources</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Update="Properties\Resources.ko-KR.resx">
       <WithCulture>false</WithCulture>
-      <LogicalName>StarResonanceDps.Plugins.KeybindTool.Properties.Resources.ko-KR.resources</LogicalName>
+      <LogicalName>BPSRControllerHelper.Properties.Resources.ko-KR.resources</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Update="Properties\Resources.zh-CN.resx">
       <WithCulture>false</WithCulture>
-      <LogicalName>StarResonanceDps.Plugins.KeybindTool.Properties.Resources.zh-CN.resources</LogicalName>
+      <LogicalName>BPSRControllerHelper.Properties.Resources.zh-CN.resources</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

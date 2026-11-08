@@ -3,9 +3,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
-using StarResonanceDps.Plugins.KeybindTool.ViewModels;
+using BPSRControllerHelper.ViewModels;
 
-namespace StarResonanceDps.Plugins.KeybindTool.Views;
+namespace BPSRControllerHelper.Views;
 
 public partial class KeybindToolView : UserControl, IDisposable
 {

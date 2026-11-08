@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
-namespace StarResonanceDps.Plugins.KeybindTool.ViewModels;
+namespace BPSRControllerHelper.ViewModels;
 
 internal abstract class ObservableObject : INotifyPropertyChanged
 {
