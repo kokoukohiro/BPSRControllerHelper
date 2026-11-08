@@ -21,7 +21,7 @@ Blue Protocol: Star Resonanceのパッド用ボタン配置を編集するため
 
 ### 更新
 
-StarResonanceDpsを閉じて、`Plugins\KeybindTool\KeybindTool.dll`を新しいファイルで上書きします。
+新しい`KeybindTool.dll`を「プラグイン」タブの「プラグインを追加」で選び、StarResonanceDpsを再起動します。設定はそのまま残ります。
 
 ### 注意事項
 
