@@ -4,6 +4,8 @@
 [![Downloads](https://img.shields.io/github/downloads/kokoukohiro/BPSRControllerHelper/total.svg)](https://github.com/kokoukohiro/BPSRControllerHelper/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-brightgreen.svg)](https://www.gnu.org/licenses/gpl-3.0.txt)
 
+![Icon](BPSRControllerHelper/Assets/icon.ico)
+
 Blue Protocol: Star Resonanceのキー設定を編集するための非公式ツールです。
 `localsave.bytes`を直接編集して、ゲーム内では調整しにくいキーの割り当てを変更できます。
 
